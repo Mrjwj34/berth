@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
 )
@@ -95,6 +96,20 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		_ = l.Close()
 	}
 	if err := Up(ctx, dir, env, pcPort); err != nil {
+		if data, readErr := os.ReadFile(LogFile(dir)); readErr == nil {
+			t.Logf("supervisor log:\n%s", data)
+		}
+		if data, readErr := os.ReadFile(PCFile(dir)); readErr == nil {
+			t.Logf("generated configuration:\n%s", data)
+		}
+		bin, _ := LookPath()
+		debugCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		args := append([]string{"process", "list", "-o", "json"}, clientArgs(dir, readPCPort(dir))...)
+		debug := exec.CommandContext(debugCtx, bin, args...)
+		debug.Env = pcEnviron(os.Environ())
+		out, debugErr := debug.CombinedOutput()
+		t.Logf("control endpoint=%s; query=%v; output=%s", Socket(dir), debugErr, out)
 		t.Fatal(err)
 	}
 	defer func() { _ = Down(ctx, dir) }()

@@ -33,11 +33,18 @@ jobs:
           export LANE_HOME="${RUNNER_TEMP}/lane-tools"
           go run ./cmd/lane doctor --fix
           echo "$LANE_HOME/bin/process-compose-v1.122.0" >> "$GITHUB_PATH"
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: native-supervisor
+          path: ${{ runner.temp }}/lane-tools/bin/process-compose-v1.122.0/process-compose
+          retention-days: 1
       - name: Format, vet and tests
         shell: bash
         run: |
           set -euo pipefail
-          test -z "$(gofmt -l cmd internal)"
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then printf '%s\n' "$unformatted"; exit 1; fi
           go vet ./cmd/... ./internal/...
           go test -race -count=1 ./cmd/... ./internal/...
       - name: Staticcheck
