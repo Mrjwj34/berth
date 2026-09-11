@@ -3,13 +3,15 @@ package worktree
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/Mrjwj34/lane/internal/copyfs"
 	"github.com/Mrjwj34/lane/internal/gitx"
 )
 
@@ -106,36 +108,106 @@ func Add(ctx context.Context, repo, path, branch, startPoint string) error {
 	return nil
 }
 
+// ValidateTarget protects the primary checkout and verifies Git ownership even
+// when --force is requested. Force never authorizes an arbitrary RemoveAll.
+func ValidateTarget(ctx context.Context, repo, path string) error {
+	if SamePath(repo, path) {
+		return fmt.Errorf("refusing to operate on the primary worktree")
+	}
+	p, err := canon(path)
+	if err != nil {
+		return err
+	}
+	r, err := canon(repo)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(p, r)
+	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("target is an ancestor of the primary repository")
+	}
+	st, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !st.IsDir() || st.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("worktree must be a real directory")
+	}
+	top, err := gitx.TopLevel(ctx, path)
+	if err != nil {
+		return err
+	}
+	if !SamePath(top, path) {
+		return fmt.Errorf("target is not a worktree root")
+	}
+	common, err := gitx.CommonDir(ctx, path)
+	if err != nil {
+		return err
+	}
+	owner, err := gitx.CommonDir(ctx, repo)
+	if err != nil {
+		return err
+	}
+	if !SamePath(common, owner) {
+		return fmt.Errorf("worktree belongs to a different repository")
+	}
+	infos, err := List(ctx, repo)
+	if err != nil {
+		return err
+	}
+	for _, info := range infos {
+		if !info.Bare && SamePath(info.Path, path) {
+			return nil
+		}
+	}
+	return fmt.Errorf("target is not a registered linked worktree")
+}
 func Remove(ctx context.Context, repo, path string, force bool) error {
+	if err := ValidateTarget(ctx, repo, path); err != nil {
+		return err
+	}
 	args := []string{"worktree", "remove"}
 	if force {
 		args = append(args, "--force")
 	}
-	args = append(args, path)
+	args = append(args, "--", path)
 	if _, err := gitx.Run(ctx, repo, args...); err != nil {
-		if force {
-			if rmErr := os.RemoveAll(path); rmErr != nil {
-				return fmt.Errorf("remove worktree %s: %w (also: %v)", path, err, rmErr)
-			}
-			_, _ = gitx.Run(ctx, repo, "worktree", "prune")
-			return nil
-		}
-		return fmt.Errorf("worktree is dirty. Commit changes or use --force: %w", err)
+		return fmt.Errorf("git worktree remove (no filesystem fallback): %w", err)
 	}
-	_, _ = gitx.Run(ctx, repo, "worktree", "prune")
 	return nil
 }
 
-func DeleteBranch(ctx context.Context, repo, branch string) error {
-	if branch == "" {
-		return nil
+func DeleteBranch(ctx context.Context, repo, branch, head string) error {
+	if branch == "" || head == "" {
+		return fmt.Errorf("branch removal requires a branch and expected commit")
 	}
-	_, err := gitx.Run(ctx, repo, "branch", "-D", branch)
-	return err
+	infos, err := List(ctx, repo)
+	if err != nil {
+		return err
+	}
+	for _, info := range infos {
+		if info.Branch == branch {
+			return fmt.Errorf("branch %s is checked out at %s; preserving it", branch, info.Path)
+		}
+	}
+	ref := "refs/heads/" + branch
+	if _, err := gitx.Run(ctx, repo, "show-ref", "--verify", "--quiet", ref); err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == 1 {
+			return nil // A previous attempt already deleted the branch.
+		}
+		return err
+	}
+	// Compare-and-delete under Git's ref lock; changed branches are never removed.
+	_, err = gitx.Run(ctx, repo, "update-ref", "--no-deref", "-d", ref, head)
+	if err != nil {
+		return fmt.Errorf("delete unchanged branch %s: %w", branch, err)
+	}
+	return nil
 }
 
 func List(ctx context.Context, repo string) ([]Info, error) {
-	out, err := gitx.Run(ctx, repo, "worktree", "list", "--porcelain")
+	out, err := gitx.Run(ctx, repo, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
 		return nil, err
 	}
@@ -147,16 +219,13 @@ func List(ctx context.Context, repo string) ([]Info, error) {
 		}
 		cur = Info{}
 	}
-	sc := bufio.NewScanner(strings.NewReader(out))
-	for sc.Scan() {
-		line := sc.Text()
+	for _, line := range strings.Split(out, "\x00") {
 		switch {
 		case strings.HasPrefix(line, "worktree "):
 			flush()
 			cur.Path = strings.TrimPrefix(line, "worktree ")
 		case strings.HasPrefix(line, "branch "):
-			ref := strings.TrimPrefix(line, "branch ")
-			cur.Branch = strings.TrimPrefix(ref, "refs/heads/")
+			cur.Branch = strings.TrimPrefix(strings.TrimPrefix(line, "branch "), "refs/heads/")
 		case line == "bare":
 			cur.Bare = true
 		case line == "":
@@ -164,7 +233,7 @@ func List(ctx context.Context, repo string) ([]Info, error) {
 		}
 	}
 	flush()
-	return infos, sc.Err()
+	return infos, nil
 }
 
 func Dirty(ctx context.Context, path string) (bool, string, error) {
@@ -192,8 +261,8 @@ func Unpublished(ctx context.Context, path string) (bool, string, error) {
 		return false, "", err
 	}
 	var behind, ahead int
-	if _, scanErr := fmt.Sscanf(counts, "%d\t%d", &behind, &ahead); scanErr != nil {
-		fmt.Sscanf(counts, "%d %d", &behind, &ahead)
+	if n, scanErr := fmt.Sscanf(counts, "%d %d", &behind, &ahead); scanErr != nil || n != 2 {
+		return false, "", fmt.Errorf("invalid Git commit counts %q", counts)
 	}
 	if ahead > 0 {
 		return true, fmt.Sprintf("%d commit(s) not pushed to %s", ahead, upstream), nil
@@ -202,86 +271,81 @@ func Unpublished(ctx context.Context, path string) (bool, string, error) {
 }
 
 func MergedInto(ctx context.Context, repo, branch, base string) (bool, error) {
-	if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", branch); err != nil {
-		return false, nil
+	if base == "" {
+		return false, fmt.Errorf("merge base is not configured")
 	}
-	if _, err := gitx.Run(ctx, repo, "merge-base", "--is-ancestor", branch, base); err != nil {
-		if _, err2 := gitx.Run(ctx, repo, "merge-base", "--is-ancestor", branch, "origin/"+base); err2 != nil {
-			return false, nil
+	if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", branch+"^{commit}"); err != nil {
+		return false, err
+	}
+	for _, ref := range []string{base, "origin/" + base} {
+		if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}"); err != nil {
+			if ctx.Err() != nil {
+				return false, ctx.Err()
+			}
+			continue
+		}
+		if _, err := gitx.Run(ctx, repo, "merge-base", "--is-ancestor", branch, ref); err == nil {
+			return true, nil
+		} else {
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 1 {
+				return false, err
+			}
 		}
 	}
-	return true, nil
+	return false, nil
 }
 
+// Preserved verifies actual HEAD, not a stale registered branch. A clean tree
+// alone is insufficient: every commit must be merged or present upstream.
+func Preserved(ctx context.Context, repo, path, base string) error {
+	dirty, detail, err := Dirty(ctx, path)
+	if err != nil {
+		return err
+	}
+	if dirty {
+		return fmt.Errorf("worktree is dirty; commit changes first:\n%s", detail)
+	}
+	head, err := gitx.Run(ctx, path, "rev-parse", "HEAD")
+	if err != nil {
+		return err
+	}
+	merged, err := MergedInto(ctx, repo, head, base)
+	if err != nil {
+		return err
+	}
+	if merged {
+		return nil
+	}
+	unpublished, why, err := Unpublished(ctx, path)
+	if err != nil {
+		return err
+	}
+	if unpublished {
+		return fmt.Errorf("work is not preserved: %s; push or merge it before removal", why)
+	}
+	return nil
+}
 func ApplyInclude(ctx context.Context, srcRepo, dest string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	includePath := filepath.Join(srcRepo, IncludeFile)
-	data, err := os.ReadFile(includePath)
+	data, err := os.ReadFile(filepath.Join(srcRepo, IncludeFile))
+	if os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read %s: %w", includePath, err)
+		return err
 	}
 	sc := bufio.NewScanner(strings.NewReader(string(data)))
 	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		rel := strings.TrimSpace(sc.Text())
+		if rel == "" || strings.HasPrefix(rel, "#") {
 			continue
 		}
-		rel := filepath.Clean(line)
-		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("%s: path %q escapes the repository", IncludeFile, line)
-		}
-		src := filepath.Join(srcRepo, rel)
-		dst := filepath.Join(dest, rel)
-		if err := copyPath(src, dst); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("copy %s: %w", rel, err)
+		if err := copyfs.CopyPath(ctx, srcRepo, dest, rel); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("include %s: %w", rel, err)
 		}
 	}
 	return sc.Err()
-}
-
-func copyPath(src, dst string) error {
-	st, err := os.Lstat(src)
-	if err != nil {
-		return err
-	}
-	if st.IsDir() {
-		return copyDirPlain(src, dst)
-	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, st.Mode().Perm())
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
-}
-
-func copyDirPlain(src, dst string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dst, rel)
-		if info.IsDir() {
-			return os.MkdirAll(target, info.Mode().Perm())
-		}
-		return copyPath(path, target)
-	})
 }

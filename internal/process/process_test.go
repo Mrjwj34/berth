@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
 )
@@ -44,16 +45,22 @@ func TestRenderExpandsAndInjectsEnv(t *testing.T) {
 }
 
 func TestUpDownSimpleHTTP(t *testing.T) {
+	t.Setenv("LANE_HOME", t.TempDir())
+	python := "python3"
 	if runtime.GOOS == "windows" {
-		t.Skip("unix socket path in this test")
+		python = "python"
 	}
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not available")
-	}
-	if _, err := LookPath(); err != nil {
-		if _, err := Ensure(context.Background()); err != nil {
-			t.Skip(err)
+	if _, err := exec.LookPath(python); err != nil {
+		if os.Getenv("LANE_TEST_REQUIRE_NATIVE") == "1" {
+			t.Fatal(err)
 		}
+		t.Skip(err)
+	}
+	if _, err := Ensure(context.Background()); err != nil {
+		if os.Getenv("LANE_TEST_REQUIRE_NATIVE") == "1" {
+			t.Fatal(err)
+		}
+		t.Skip(err)
 	}
 	dir := t.TempDir()
 	if err := os.MkdirAll(config.LaneDir(dir), 0o755); err != nil {
@@ -72,17 +79,48 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 	}
 	procs := map[string]any{
 		"web": map[string]any{
-			"command": "python3 -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
+			"command": python + " -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
 		},
 	}
 	if err := Render(dir, procs, env); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err := Up(ctx, dir, env, 0); err != nil {
+	pcPort := 0
+	if runtime.GOOS == "windows" {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		pcPort = l.Addr().(*net.TCPAddr).Port
+		_ = l.Close()
+	}
+	t.Cleanup(func() {
+		if err := Down(context.Background(), dir); err != nil {
+			t.Errorf("stop test supervisor: %v", err)
+		}
+	})
+	if err := Up(ctx, dir, env, pcPort); err != nil {
+		if data, readErr := os.ReadFile(LogFile(dir)); readErr == nil {
+			t.Logf("supervisor log:\n%s", data)
+		}
+		if data, readErr := os.ReadFile(PCFile(dir)); readErr == nil {
+			t.Logf("generated configuration:\n%s", data)
+		}
+		bin, _ := LookPath()
+		debugCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		control, controlErr := clientArgs(dir, readPCPort(dir))
+		if controlErr != nil {
+			t.Fatalf("startup: %v; control: %v", err, controlErr)
+		}
+		args := append([]string{"process", "list", "-o", "json"}, control...)
+		debug := exec.CommandContext(debugCtx, bin, args...)
+		debug.Env = pcEnviron(os.Environ())
+		out, debugErr := debug.CombinedOutput()
+		t.Logf("control endpoint=%s; query=%v; output=%s", Socket(dir), debugErr, out)
 		t.Fatal(err)
 	}
-	defer func() { _ = Down(ctx, dir) }()
 	if !Running(ctx, dir) {
 		t.Fatal("expected running")
 	}

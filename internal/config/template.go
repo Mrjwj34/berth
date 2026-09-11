@@ -1,41 +1,40 @@
 package config
 
-const Template = `# lane.yaml — isolation primitives only. lane does not know any datastore.
-# Agent onboarding: read SKILL.md, make ports/data-dir env-driven, then
-#   lane new smoke --up
-# and commit this file once the smoke workspace is healthy.
+const Template = `# Commit lane.yaml before creating workspaces; each worktree uses its own config.
 version: 1
-base: main                                   # baseline branch; created branches use prefix lane/
-
-# Named ports become LANE_PORT_<NAME> (name uppercased, '-' -> '_').
-# ports: [web, api]
-
+base: main
+runtime:
+  backend: native
+# Native mode: programs must accept a configurable port/data path.
+# ports: [web]
 # env:
-#   PORT: ${LANE_PORT_API}
-#   DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app
-
-# Optional dotenv managed block (# BEGIN LANE ... # END LANE)
-# env_file: .env.local
-
-# Fast clone/hardlink/copy from the main worktree after git checkout.
-# copy_dirs:
-#   - node_modules
-
-hooks:
-  setup: []
-  teardown: []
-
-# process-compose syntax, passed through. Commands see every LANE_* variable.
+#   PORT: ${LANE_PORT_WEB}
 # processes:
-#   api:
-#     command: go run ./cmd/server
-#     readiness_probe:
-#       http_get:
-#         port: "${LANE_PORT_API}"
-#         path: /healthz
+#   web:
+#     command: npm run dev -- --port "$LANE_PORT_WEB"
 
+# For hardcoded ports, prepare a Linux runtime image once, then use:
+# runtime:
+#   backend: container
+#   engine: docker
+#   image: lane-runtime:local
+# ports: [web]
+# listen: {web: 8080}
+# processes:
+#   web:
+#     command: python3 -m http.server 8080 --bind 127.0.0.1
+#     readiness_probe:
+#       http_get: {host: 127.0.0.1, port: 8080, path: /}
+
+# LANE_PORT_* is relative to the execution context.
+# LANE_HOST_PORT_* always refers to the host publication (e.g. browser URLs).
+# env_file: .env.local
+# copy_dirs: [node_modules]  # CoW where supported, independent copy otherwise
+hooks:
+  setup: []                # must be idempotent; incomplete setup is retried
+  teardown: []
 gc:
-  idle_stop_hours: 4
-  remove_after_days: 7
-  max_workspaces: 8
+  idle_stop_hours: 0        # explicit opt-in; based on lane operations
+  remove_after_days: 0      # GC is invoked explicitly, never forced
+  max_workspaces: 0
 `

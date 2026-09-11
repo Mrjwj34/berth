@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -94,20 +96,31 @@ func MergeEnv(identity map[string]string, declared map[string]string) map[string
 }
 
 func Environ(base []string, vars map[string]string) []string {
-	keys := make(map[string]int, len(base))
-	out := append([]string(nil), base...)
-	for i, kv := range out {
-		if name, _, ok := strings.Cut(kv, "="); ok {
-			keys[name] = i
+	type entry struct{ key, value string }
+	values := map[string]entry{}
+	canonical := func(k string) string {
+		if runtime.GOOS == "windows" {
+			return strings.ToUpper(k)
+		}
+		return k
+	}
+	for _, kv := range base {
+		if k, v, ok := strings.Cut(kv, "="); ok && k != "" {
+			values[canonical(k)] = entry{k, v}
 		}
 	}
 	for k, v := range vars {
-		entry := k + "=" + v
-		if i, ok := keys[k]; ok {
-			out[i] = entry
-			continue
-		}
-		out = append(out, entry)
+		values[canonical(k)] = entry{k, v}
+	}
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		e := values[k]
+		out = append(out, e.key+"="+e.value)
 	}
 	return out
 }
@@ -123,6 +136,9 @@ func WriteEnvFile(path string, vars map[string]string) error {
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read %s: %w", path, err)
 	}
+	if strings.Contains(string(existing), EnvBegin) && !strings.Contains(string(existing), EnvEnd) {
+		return fmt.Errorf("unterminated managed env block; refusing to overwrite %s", path)
+	}
 	body := stripManaged(string(existing))
 	block := renderManaged(vars)
 	var b strings.Builder
@@ -131,7 +147,7 @@ func WriteEnvFile(path string, vars map[string]string) error {
 		b.WriteByte('\n')
 	}
 	b.WriteString(block)
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
@@ -164,7 +180,11 @@ func renderManaged(vars map[string]string) string {
 	b.WriteString(EnvBegin)
 	b.WriteByte('\n')
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s=%s\n", k, vars[k])
+		value := vars[k]
+		if strings.ContainsAny(value, " \t#\\\"'") {
+			value = "\"" + strings.NewReplacer("\\", "\\\\", "\"", "\\\"").Replace(value) + "\""
+		}
+		fmt.Fprintf(&b, "%s=%s\n", k, value)
 	}
 	b.WriteString(EnvEnd)
 	b.WriteByte('\n')

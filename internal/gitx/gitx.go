@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,14 @@ func Run(ctx context.Context, dir string, args ...string) (string, error) {
 	}
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	for _, kv := range os.Environ() {
+		key, _, _ := strings.Cut(kv, "=")
+		switch key {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE":
+			continue
+		}
+		cmd.Env = append(cmd.Env, kv)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -23,7 +32,7 @@ func Run(ctx context.Context, dir string, args ...string) (string, error) {
 		if msg == "" {
 			msg = err.Error()
 		}
-		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), msg)
+		return "", fmt.Errorf("git %s: %s: %w", strings.Join(args, " "), msg, err)
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }

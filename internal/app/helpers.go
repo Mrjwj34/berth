@@ -1,22 +1,18 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
 	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/ports"
-	"github.com/Mrjwj34/lane/internal/process"
-	"github.com/Mrjwj34/lane/internal/skill"
+	"github.com/Mrjwj34/lane/internal/runner"
 	"github.com/Mrjwj34/lane/internal/state"
 	"github.com/Mrjwj34/lane/internal/worktree"
 )
@@ -28,251 +24,276 @@ func cwd() string {
 	}
 	return dir
 }
-
-func loadConfig(repo string) (*config.Config, string, error) {
-	if config.Exists(repo) {
-		cfg, err := config.Load(filepath.Join(repo, config.Filename))
-		return cfg, repo, err
+func loadConfig(root string) (*config.Config, string, error) {
+	path := filepath.Join(root, config.Filename)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		d := config.Defaults()
+		return &d, root, nil
+	} else if err != nil {
+		return nil, root, err
 	}
-	d := config.Defaults()
-	return &d, repo, nil
+	cfg, err := config.Load(path)
+	return cfg, root, err
 }
-
-func (a *App) lookupSlug(ctx context.Context, repo, slug string) (state.Workspace, bool) {
-	file, err := a.Store.Read(ctx)
+func mustKey(path string) string {
+	key, err := state.Key(path)
 	if err != nil {
-		return state.Workspace{}, false
+		return filepath.Clean(path)
 	}
-	return file.BySlug(repo, slug)
+	return key
 }
-
-func (a *App) resolve(ctx context.Context, slugOrPath string) (state.Workspace, error) {
-	file, err := a.Store.Read(ctx)
+func newID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", b[:]), nil
+}
+func (a *App) resolve(ctx context.Context, key string) (state.Workspace, error) {
+	f, err := a.Store.Read(ctx)
 	if err != nil {
 		return state.Workspace{}, err
 	}
-	if slugOrPath != "" {
-		if ws, ok := file.Lookup(slugOrPath); ok {
+	if key != "" {
+		if ws, ok := f.Lookup(key); ok {
 			return ws, nil
 		}
 		if repo, err := gitx.MainRepo(ctx, cwd()); err == nil {
-			if ws, ok := file.BySlug(repo, slugOrPath); ok {
+			if ws, ok := f.BySlug(repo, key); ok {
 				return ws, nil
 			}
 		}
-		for _, ws := range file.Workspaces {
-			if ws.Slug == slugOrPath || ws.Path == slugOrPath {
-				return ws, nil
+		var matches []state.Workspace
+		for _, ws := range f.Workspaces {
+			if ws.Slug == key {
+				matches = append(matches, ws)
 			}
 		}
-		return state.Workspace{}, fmt.Errorf("workspace %q not found. Run lane ls", slugOrPath)
-	}
-	here := mustKey(cwd())
-	for path, ws := range file.Workspaces {
-		if here == path || strings.HasPrefix(here, path+string(filepath.Separator)) {
-			return ws, nil
+		if len(matches) == 1 {
+			return matches[0], nil
+		}
+		if len(matches) > 1 {
+			return state.Workspace{}, fmt.Errorf("ambiguous slug %q; use workspace path", key)
+		}
+	} else {
+		here := mustKey(cwd())
+		var best state.Workspace
+		for path, ws := range f.Workspaces {
+			if (here == path || strings.HasPrefix(here, path+string(filepath.Separator))) && len(path) > len(best.Path) {
+				best = ws
+			}
+		}
+		if best.Path != "" {
+			return best, nil
 		}
 	}
-	if top, err := gitx.TopLevel(ctx, cwd()); err == nil {
-		if ws, ok := file.Lookup(top); ok {
-			return ws, nil
-		}
-	}
-	return state.Workspace{}, fmt.Errorf("no workspace for this directory. Run lane new <slug> or lane adopt")
+	return state.Workspace{}, fmt.Errorf("workspace not found; run lane ls or lane adopt")
 }
-
-func (a *App) allocate(ctx context.Context, names []string) (map[string]int, error) {
-	if len(names) == 0 {
-		return map[string]int{}, nil
-	}
-	file, err := a.Store.Read(ctx)
+func (a *App) locked(ctx context.Context, key string, fn func(state.Workspace) error) error {
+	ws, err := a.resolve(ctx, key)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return ports.Allocate(ctx, file.UsedPorts(), names)
+	unlock, err := a.Store.LockWorkspace(ctx, ws.Path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	cur, err := a.resolve(ctx, ws.Path)
+	if err != nil {
+		return err
+	}
+	if cur.ID != ws.ID {
+		return fmt.Errorf("workspace replaced during operation")
+	}
+	return fn(cur)
 }
-
-func (a *App) touch(ctx context.Context, path string) error {
+func (a *App) update(ctx context.Context, ws state.Workspace, fn func(*state.Workspace)) error {
 	return a.Store.Update(ctx, func(f *state.File) error {
-		ws, ok := f.Workspaces[path]
-		if !ok {
-			return nil
+		cur, ok := f.Workspaces[ws.Path]
+		if !ok || cur.ID != ws.ID {
+			return fmt.Errorf("workspace identity changed")
 		}
-		state.Touch(&ws)
-		f.Workspaces[path] = ws
+		fn(&cur)
+		f.Workspaces[ws.Path] = cur
 		return nil
 	})
 }
-
-func (a *App) prepare(ctx context.Context, cfg *config.Config, ws state.Workspace) error {
-	if err := os.MkdirAll(config.DataDir(ws.Path), 0o755); err != nil {
+func (a *App) touch(ctx context.Context, path string) error {
+	ws, err := a.resolve(ctx, path)
+	if err != nil {
 		return err
 	}
-	if err := a.writeEnv(cfg, ws); err != nil {
-		return err
-	}
-	env := workspaceEnv(cfg, ws)
-	return runHooks(ctx, ws.Path, cfg.Hooks.Setup, env)
+	return a.update(ctx, ws, state.Touch)
 }
-
-func (a *App) writeEnv(cfg *config.Config, ws state.Workspace) error {
-	env := workspaceEnv(cfg, ws)
-	if cfg.EnvFile == "" {
-		return nil
-	}
-	path := cfg.EnvFile
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(ws.Path, path)
-	}
-	return config.WriteEnvFile(path, env)
-}
-
-func workspaceEnv(cfg *config.Config, ws state.Workspace) map[string]string {
-	id := config.IdentityVars(ws.Path, ws.Slug, ws.Repo, ws.Branch, ws.Ports)
-	return config.MergeEnv(id, cfg.Env)
-}
-
-func (a *App) view(ctx context.Context, ws state.Workspace, withEnv bool) (*WorkspaceView, error) {
-	cfg, _, _ := loadConfig(ws.Repo)
-	if cfg == nil {
-		d := config.Defaults()
-		cfg = &d
-	}
-	dirty, _, _ := worktree.Dirty(ctx, ws.Path)
-	v := &WorkspaceView{
-		Slug:      ws.Slug,
-		Path:      ws.Path,
-		Repo:      ws.Repo,
-		Branch:    ws.Branch,
-		Ports:     ws.Ports,
-		Running:   process.Running(ctx, ws.Path),
-		Dirty:     dirty,
-		CreatedAt: ws.CreatedAt,
-		LastUsed:  ws.LastUsedAt,
-	}
-	if withEnv {
-		v.Env = workspaceEnv(cfg, ws)
-	}
-	if v.Running {
-		if procs, err := process.Status(ctx, ws.Path); err == nil {
-			v.Processes = procs
+func (a *App) record(ctx context.Context, ws state.Workspace, phase string, cause error) error {
+	return a.update(ctx, ws, func(w *state.Workspace) {
+		w.Phase = phase
+		w.LastError = ""
+		if cause != nil {
+			w.LastError = cause.Error()
 		}
-	}
-	return v, nil
+		state.Touch(w)
+	})
 }
-
-func runHooks(ctx context.Context, dir string, commands []string, env map[string]string) error {
-	for _, line := range commands {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+func (a *App) failure(ws state.Workspace, err error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if e := a.record(ctx, ws, "failed", err); e != nil {
+		return fmt.Errorf("%w (record state: %v)", err, e)
+	}
+	return err
+}
+func identityPath(ws state.Workspace) string { return filepath.Join(ws.Path, ".lane", "identity.json") }
+func safeDirectory(root, rel string) error {
+	cur := root
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if part == "" || part == "." || part == ".." {
+			return fmt.Errorf("invalid managed directory")
 		}
-		var cmd *exec.Cmd
-		if runtime.GOOS == "windows" {
-			cmd = exec.CommandContext(ctx, "cmd", "/C", line)
-		} else {
-			cmd = exec.CommandContext(ctx, "sh", "-c", line)
+		cur = filepath.Join(cur, part)
+		st, err := os.Lstat(cur)
+		if os.IsNotExist(err) {
+			if err := os.Mkdir(cur, 0o700); err != nil && !os.IsExist(err) {
+				return err
+			}
+			st, err = os.Lstat(cur)
 		}
-		cmd.Dir = dir
-		cmd.Env = config.Environ(os.Environ(), env)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("hook %q failed: %w. Fix the command or run lane doctor", line, err)
+		if err != nil {
+			return err
+		}
+		if !st.IsDir() || st.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("managed directory is not a real directory: %s", cur)
 		}
 	}
 	return nil
 }
-
-func mustKey(path string) string {
-	k, err := state.Key(path)
-	if err != nil {
-		return filepath.Clean(path)
-	}
-	return k
-}
-
-func newID() string {
-	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return fmt.Sprintf("%d", os.Getpid())
-	}
-	return fmt.Sprintf("%x", b[:])
-}
-
-func ensureGitignore(repo string) error {
-	path := filepath.Join(repo, ".gitignore")
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+func writeIdentity(ws state.Workspace) error {
+	if err := safeDirectory(ws.Path, ".lane/data"); err != nil {
 		return err
 	}
-	s := string(data)
-	if strings.Contains(s, ".lane/") {
+	for _, name := range []string{"identity.json", ".gitignore"} {
+		if st, err := os.Lstat(filepath.Join(ws.Path, ".lane", name)); err == nil && !st.Mode().IsRegular() {
+			return fmt.Errorf("invalid metadata file: %s", name)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(ws.Path, ".lane", ".gitignore"), []byte("*\n"), 0o600); err != nil {
+		return err
+	}
+	data, err := json.Marshal(struct{ ID, Repo, GitDir string }{ws.ID, ws.Repo, ws.GitDir})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(identityPath(ws), append(data, '\n'), 0o600)
+}
+func validateIdentity(ctx context.Context, ws state.Workspace) error {
+	if err := worktree.ValidateTarget(ctx, ws.Repo, ws.Path); err != nil {
+		return err
+	}
+	if ws.ID == "" || ws.GitDir == "" || ws.Ownership == "" {
+		return fmt.Errorf("legacy workspace: run lane adopt in it to register safe lifecycle identity")
+	}
+	dir, err := gitx.Run(ctx, ws.Path, "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return err
+	}
+	if !worktree.SamePath(dir, ws.GitDir) {
+		return fmt.Errorf("worktree Git identity changed")
+	}
+	branch, err := gitx.CurrentBranch(ctx, ws.Path)
+	if err != nil {
+		return err
+	}
+	if branch != ws.Branch {
+		return fmt.Errorf("workspace branch changed from %s to %s", ws.Branch, branch)
+	}
+	st, err := os.Lstat(filepath.Join(ws.Path, ".lane"))
+	if err != nil {
+		return err
+	}
+	if !st.IsDir() || st.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("invalid .lane directory")
+	}
+	st, err = os.Lstat(identityPath(ws))
+	if err != nil {
+		return err
+	}
+	if !st.Mode().IsRegular() {
+		return fmt.Errorf("invalid identity marker")
+	}
+	data, err := os.ReadFile(identityPath(ws))
+	if err != nil {
+		return err
+	}
+	var m struct{ ID, Repo, GitDir string }
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	if m.ID != ws.ID || !worktree.SamePath(m.Repo, ws.Repo) || !worktree.SamePath(m.GitDir, ws.GitDir) {
+		return fmt.Errorf("workspace identity marker mismatch")
+	}
+	return nil
+}
+func (a *App) session(ctx context.Context, ws state.Workspace) (*runner.Session, error) {
+	if ws.RemovalHead != "" {
+		return nil, fmt.Errorf("workspace removal is pending; retry lane done %s", ws.Path)
+	}
+	if err := validateIdentity(ctx, ws); err != nil {
+		return nil, err
+	}
+	cfg, _, err := loadConfig(ws.Path)
+	if err != nil {
+		return nil, err
+	}
+	return runner.New(cfg, ws)
+}
+func (a *App) writeEnv(s *runner.Session) error {
+	rel := s.Config.EnvFile
+	if rel == "" {
 		return nil
 	}
-	var b strings.Builder
-	b.WriteString(s)
-	if s != "" && !strings.HasSuffix(s, "\n") {
-		b.WriteByte('\n')
+	if err := config.RelativePath(rel); err != nil {
+		return err
 	}
-	b.WriteString("\n# lane workspaces\n.lane/\n")
-	return os.WriteFile(path, []byte(b.String()), 0o644)
+	if parent := filepath.Dir(rel); parent != "." {
+		if err := safeDirectory(s.Workspace.Path, filepath.ToSlash(parent)); err != nil {
+			return err
+		}
+	}
+	path := filepath.Join(s.Workspace.Path, rel)
+	if st, err := os.Lstat(path); err == nil && !st.Mode().IsRegular() {
+		return fmt.Errorf("env_file must be a regular file")
+	}
+	return config.WriteEnvFile(path, s.Env())
 }
-
-func writeCursorHook(repo string) error {
-	data, err := skill.HookAsset("cursor.worktrees.json")
+func (a *App) view(ctx context.Context, ws state.Workspace, withEnv bool) (*WorkspaceView, error) {
+	v := &WorkspaceView{Slug: ws.Slug, Path: ws.Path, Repo: ws.Repo, Branch: ws.Branch, Ports: ws.Ports, Listen: ws.Listen, CreatedAt: ws.CreatedAt, LastUsed: ws.LastUsedAt, Phase: ws.Phase, Ownership: ws.Ownership, Error: ws.LastError}
+	cfg, _, err := loadConfig(ws.Path)
 	if err != nil {
-		return err
+		v.Error = err.Error()
 	}
-	dest := filepath.Join(repo, ".cursor", "worktrees.json")
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return err
+	s := &runner.Session{Config: cfg, Workspace: ws}
+	v.Runtime = s.Plan()
+	if withEnv {
+		v.Env = s.HostEnv()
 	}
-	if existing, err := os.ReadFile(dest); err == nil {
-		var cur map[string]any
-		var add map[string]any
-		if json.Unmarshal(existing, &cur) == nil && json.Unmarshal(data, &add) == nil {
-			for k, v := range add {
-				cur[k] = v
-			}
-			if merged, err := json.MarshalIndent(cur, "", "  "); err == nil {
-				return os.WriteFile(dest, append(merged, '\n'), 0o644)
-			}
-		}
-	}
-	return os.WriteFile(dest, data, 0o644)
-}
-
-func writeClaudeHook(repo string) error {
-	data, err := skill.HookAsset("claude.settings.json")
+	dirty, _, err := worktree.Dirty(ctx, ws.Path)
+	v.Dirty = dirty
 	if err != nil {
-		return err
+		v.Error = err.Error()
 	}
-	dest := filepath.Join(repo, ".claude", "settings.json")
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return err
+	running, err := s.Running(ctx)
+	v.Running = running
+	if err != nil {
+		v.Error = err.Error()
 	}
-	if existing, err := os.ReadFile(dest); err == nil && len(bytes.TrimSpace(existing)) > 0 {
-		var cur map[string]any
-		var add map[string]any
-		if json.Unmarshal(existing, &cur) == nil && json.Unmarshal(data, &add) == nil {
-			mergeMaps(cur, add)
-			if merged, err := json.MarshalIndent(cur, "", "  "); err == nil {
-				return os.WriteFile(dest, append(merged, '\n'), 0o644)
-			}
+	if running {
+		procs, err := s.Status(ctx)
+		if err != nil {
+			v.Error = err.Error()
+		} else {
+			v.Processes = procs
 		}
 	}
-	return os.WriteFile(dest, data, 0o644)
-}
-
-func mergeMaps(dst, src map[string]any) {
-	for k, v := range src {
-		if existing, ok := dst[k].(map[string]any); ok {
-			if incoming, ok := v.(map[string]any); ok {
-				mergeMaps(existing, incoming)
-				continue
-			}
-		}
-		dst[k] = v
-	}
+	return v, nil
 }

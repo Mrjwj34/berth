@@ -19,7 +19,7 @@ func TestReadMissingFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Version != 1 || len(f.Workspaces) != 0 {
+	if f.Version != version || len(f.Workspaces) != 0 {
 		t.Fatalf("unexpected empty state: %+v", f)
 	}
 }

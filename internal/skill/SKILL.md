@@ -1,87 +1,68 @@
 ---
 name: lane
-description: Manage isolated local Agent workspaces with git worktrees, unique ports, private data dirs, and project-declared processes.
+description: Manage independent local agent workspaces, explicit native/container runtimes, processes and safe cleanup.
 ---
 
 # lane
 
-Project-agnostic, harness-agnostic local Agent workspace CLI. Isolation primitives only: Git worktree, named port block (`LANE_PORT_<NAME>`), private `LANE_DATA_DIR`, project-declared processes. Identity is the directory path. lane does not know Postgres, MySQL, Redis, or any other service.
+Use lane for parallel local development, independent Git worktrees, private data
+and managed service graphs. lane is not an adversarial security sandbox. Do not
+replace lane lifecycle operations with raw rm -rf or guessed PID/port cleanup.
 
-## 1. When to use
+## Onboard
 
-Use lane when a task needs an isolated local workspace: unique ports, a private data dir, and optional project processes — without a VM as the isolation layer.
+Read the project's startup scripts, toolchains, storage paths and listen ports.
+Choose native for already configurable programs. Choose container for unchanged
+hardcoded ports or a uniform Linux environment. Do not attempt preload/seccomp
+injection. The Linux engine and prepared image must exist; failures must not be
+worked around by silently running the command on the host.
 
-Do not use raw `git worktree`, process-compose, or hand-picked ports. Use this skill and the `lane` CLI.
+Commit lane.yaml before creating a workspace. New workspaces execute their own
+branch-local configuration. Native `ports: [web]` allocates LANE_PORT_WEB; use
+existing command/config options. Container mode requires runtime.backend:
+container, an existing runtime.image, named ports and listen mappings. Include
+project tools, bash, sh, sleep, socat, Git and process-compose v1.122.0 in the image.
+Build/install dependencies once per image rather than every run where possible.
 
-## 2. Project onboarding
+Use workspace-private data. Copying mutable dependencies uses CoW/plain copy, not
+hardlinks. External symlinks and absolute shared storage need explicit treatment.
 
-When the repo has no `lane.yaml` (or it is incomplete), onboard it:
+## Execute
 
-1. **Read how the project starts.** Find the app, tests, and every datastore. Note every listen port and every on-disk path.
-2. **Make ports and data-dir env-driven.** Replace hardcoded `5432`, `3000`, `./data` with env. The app must read `LANE_PORT_*` and `LANE_DATA_DIR` (or values you derive into `DATABASE_URL`, `PORT`, etc.). Never hardcode ports. Discover assigned values with `lane status --json` / `lane ports --json`.
-3. **Write `lane.yaml`** at the repo root. Declare `ports`, `env`, `hooks.setup`, and `processes`. Recipes in `docs/recipes/` are ordinary processes — not first-class service types.
-4. **Self-test:** `lane new smoke --up`. Confirm readiness from JSON status/ports. Then `lane done smoke`.
-5. **Commit** `lane.yaml` (and `.worktreeinclude` / `env_file` if used).
+```sh
+lane new task-name --up --json
+lane plan task-name
+lane status --json
+lane ports --json
+lane run -- <program> <args...>
+lane logs <process>
+```
 
-Always-injected env: `LANE_DATA_DIR`, `LANE_WORKSPACE` (abs worktree path), `LANE_SLUG`, `LANE_ROOT` (main repo path), `LANE_BRANCH`, plus `LANE_PORT_<NAME>` for each declared port (name uppercased, `-` → `_`).
+Use lane run for tests/migrations/one-off work: it joins the same runtime as the
+services and hooks. Arguments are not reparsed. Request a shell explicitly with
+`lane run -- sh -c '...'` in Linux/container mode, or the appropriate native shell.
+Container cancellation stops that workspace's runtime, including its sibling
+services. Do not assume a shell script is portable between sh and Windows cmd.
 
-Default data dir: `<worktree>/.lane/data`. Branch created as `lane/<slug>` from `base` (default `main`). Worktree default path: sibling `<parent>/<reponame>.lanes/<slug>`.
+LANE_PORT_* is the port in the execution context. LANE_HOST_PORT_* is the host
+publication. A browser outside the runtime must use the host port. Container
+publications are TCP over IPv4 loopback. `plan.gateway_ports` reserves internal
+forwarder ports; application listeners must not use those values. Undeclared
+internal ports are isolated but not automatically discovered/published.
 
-Optional config: `.worktreeinclude` (one relative path per line, `#` comments) copies extra files from the main repo; `copy_dirs` fast-clones dirs like `node_modules`; `env_file` writes a managed block between `# BEGIN LANE` / `# END LANE`.
+## Cleanup and recovery
 
-## 3. Daily lifecycle
+Never use --force for automatic GC or to hide failed checks. `done` requires
+preserved commits and a clean worktree for lane-owned checkouts. `--force` cannot
+bypass ownership, primary-worktree protection, identity or shutdown checks.
+`adopt` is only for linked worktrees. `done` on an adopted checkout stops and
+unregisters its runtime, preserving checkout/data/branch even with --force.
 
-One task, one workspace.
+A failed setup leaves its worktree and state for diagnosis. Fix the workspace's
+config/hook and retry `lane new <same-name>` or `lane up`; hooks must be idempotent.
+A runtime or named-port contract change needs a new workspace. Use `down` to
+preserve data, `reset` to intentionally reset it only after verified shutdown.
 
-1. `lane new <slug>` (add `--up` to start processes; `--base <branch>` if not `main`).
-2. **Work only in the printed path.** Do not edit the main checkout.
-3. `lane up` / `lane status --json` / `lane logs [proc]` / `lane ports --json` / `lane run -- <cmd>` as needed.
-4. `lane done [slug]` when finished. `lane gc` reclaims leftovers.
-
-`lane` (no args) is the global overview. `lane attach [slug]` enters an existing workspace. `lane reset` stops processes, wipes `$LANE_DATA_DIR`, and re-runs `hooks.setup`.
-
-## 4. Iron rules
-
-- **Never bypass lane.** No raw `git worktree add/remove`, no invoking process-compose, no ad-hoc ports. process-compose is auto-fetched (pinned v1.122.0) into `$LANE_HOME/bin`; agents never run it.
-- **On failure:** run `lane doctor` (then `lane doctor --fix` if appropriate). Report the diagnosis. Do not invent a workaround.
-- **Never `--force`** without explicit user authorization.
-- **Never print secrets.** Connection strings and env files stay off the transcript.
-
-## 5. Harness
-
-Core is **CLI + `lane.yaml` + this skill**. Cursor `worktrees.json` and Claude Code hooks are optional adapters (`lane hook install [cursor|claude|all]`).
-
-If Cursor or Claude already created a worktree, `cd` into that directory and run `lane adopt` (or `lane adopt --setup`). Do not create a second workspace for the same task.
-
-## 6. Actionable failures
-
-Errors name the cause and the next command. Match that style; do not swallow them.
-
-- `worktree is dirty. Commit changes or use --force`
-- Missing `lane.yaml`: run `lane init`, then complete ports/env/processes.
-- Unhealthy process or port: `lane status --json`, `lane logs [proc]`, `lane doctor`.
-
-Query commands (`ls`, `status`, `ports`, `doctor`) accept `--json`. Prefer JSON when parsing.
-
-## Command reference
-
-| Command | Purpose |
-| :--- | :--- |
-| `lane` | Global overview |
-| `lane init` | Commented `lane.yaml` + skill install |
-| `lane skill install` | Install this skill into agent skill dirs |
-| `lane hook install [cursor\|claude\|all]` | Optional Cursor/Claude adapters |
-| `lane new <slug> [--up] [--base <branch>]` | Create workspace; prints the worktree path |
-| `lane attach [slug]` | Enter an existing workspace |
-| `lane adopt [--setup]` | Register an existing worktree from cwd |
-| `lane ls\|status\|ports [--json]` | List / current status / port map |
-| `lane up\|down` | Start / stop project processes |
-| `lane logs [proc]` | Process logs |
-| `lane run -- <cmd>` | Run a command with `LANE_*` injected |
-| `lane reset` | Wipe data dir and re-run setup |
-| `lane done [slug] [--force]` | Tear down a workspace |
-| `lane gc [--dry-run]` | Reclaim vanished/idle/merged/excess workspaces |
-| `lane doctor [--fix]` | Diagnose (and optionally repair) the toolchain |
-| `lane open [port-name]` | Open a named port in the browser |
-
-State file: `$LANE_HOME/state.json` (default `~/.lane/state.json`). Tests set `LANE_HOME`. GC: vanished dirs reclaim ports; `idle_stop_hours` stops processes; `remove_after_days` removes merged-branch workspaces; `max_workspaces` evicts the oldest clean stopped workspaces.
+`lane gc --dry-run --json` previews collection. GC skips active operations and
+unpreserved commits. `doctor --fix` installs native dependencies; it never performs
+destructive GC. Unknown process/engine state means preserve data and inspect logs.

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"sort"
+	"strings"
 
 	"github.com/Mrjwj34/lane/internal/app"
 	"github.com/spf13/cobra"
@@ -88,8 +91,18 @@ func cmdAttach(asJSON *bool) *cobra.Command {
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "path\t%s\n", ws.Path)
 				fmt.Fprintf(cmd.OutOrStdout(), "branch\t%s\n", ws.Branch)
-				for k, v := range ws.Env {
-					fmt.Fprintf(cmd.OutOrStdout(), "export %s=%q\n", k, v)
+				keys := make([]string, 0, len(ws.Env))
+				for k := range ws.Env {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					v := ws.Env[k]
+					if runtime.GOOS == "windows" {
+						fmt.Fprintf(cmd.OutOrStdout(), "$env:%s = '%s'\n", k, strings.ReplaceAll(v, "'", "''"))
+					} else {
+						fmt.Fprintf(cmd.OutOrStdout(), "export %s='%s'\n", k, strings.ReplaceAll(v, "'", "'\"'\"'"))
+					}
 				}
 				return nil
 			})
@@ -177,7 +190,7 @@ func cmdPorts(asJSON *bool) *cobra.Command {
 					return err
 				}
 				if *asJSON {
-					return writeJSON(cmd.OutOrStdout(), map[string]any{"slug": ws.Slug, "path": ws.Path, "ports": ws.Ports})
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"slug": ws.Slug, "path": ws.Path, "ports": ws.Ports, "listen": ws.Listen})
 				}
 				for name, port := range ws.Ports {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s\t%d\n", name, port)
@@ -285,7 +298,7 @@ func cmdDone() *cobra.Command {
 				if err := a.Done(ctx, slug, force); err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "removed")
+				fmt.Fprintln(cmd.OutOrStdout(), "workspace released (adopted checkouts are preserved)")
 				return nil
 			})
 		},
@@ -307,6 +320,9 @@ func cmdGC(asJSON *bool) *cobra.Command {
 				}
 				if *asJSON {
 					return writeJSON(cmd.OutOrStdout(), rep)
+				}
+				for _, warning := range rep.Warnings {
+					fmt.Fprintln(cmd.ErrOrStderr(), "warning:", warning)
 				}
 				if len(rep.Actions) == 0 {
 					fmt.Fprintln(cmd.OutOrStdout(), "nothing to collect")
@@ -351,7 +367,7 @@ func cmdDoctor(asJSON *bool) *cobra.Command {
 			})
 		},
 	}
-	c.Flags().BoolVar(&fix, "fix", false, "download process-compose and reclaim vanished workspaces")
+	c.Flags().BoolVar(&fix, "fix", false, "install missing native dependencies; never delete workspaces")
 	return c
 }
 

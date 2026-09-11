@@ -1,61 +1,71 @@
 name: ci
-
 on:
   pull_request:
   push:
     branches: [main]
   workflow_dispatch:
-
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 jobs:
-  ci:
-    name: ci (ubuntu-latest)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: fmt
-        run: |
-          unformatted=$(gofmt -l cmd internal)
-          if [ -n "$unformatted" ]; then
-            echo "Unformatted files:"
-            echo "$unformatted"
-            exit 1
-          fi
-      - name: vet
-        run: go vet ./cmd/... ./internal/...
-      - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./cmd/... ./internal/...
-      - name: test
-        run: go test ./cmd/... ./internal/...
-      - name: test (race)
-        run: go test -race ./cmd/... ./internal/...
-      - name: build
-        run: go build -o bin/lane ./cmd/lane
-
-  cross-platforms:
-    name: build (${{ matrix.os }})
+  core:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      LANE_TEST_REQUIRE_NATIVE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-      - name: test
-        run: go test ./cmd/... ./internal/...
-      - name: build
-        run: go build -o bin/lane${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./cmd/lane
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned native supervisor
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LANE_HOME="${RUNNER_TEMP}/lane-tools"
+          go run ./cmd/lane doctor --fix
+          echo "$LANE_HOME/bin/process-compose-v1.122.0" >> "$GITHUB_PATH"
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: native-supervisor
+          path: ${{ runner.temp }}/lane-tools/bin/process-compose-v1.122.0/process-compose
+          retention-days: 1
+      - name: Format, vet and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then printf '%s\n' "$unformatted"; exit 1; fi
+          go vet ./cmd/... ./internal/...
+          go test -race -count=1 ./cmd/... ./internal/...
+      - name: Staticcheck
+        if: runner.os == 'Linux'
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./cmd/... ./internal/...
+      - name: Build
+        run: go build ./cmd/lane
+      - name: Real native CLI acceptance test (no skip)
+        shell: bash
+        run: python tests/native_e2e.py ./lane${{ runner.os == 'Windows' && '.exe' || '' }}
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build shared runtime image once
+        run: docker build -t lane-runtime:test -f runtime/Dockerfile .
+      - name: Build lane
+        run: go build -o /tmp/lane ./cmd/lane
+      - name: Real container acceptance test (no skip)
+        run: python3 tests/container_e2e.py /tmp/lane lane-runtime:test
