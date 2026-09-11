@@ -189,8 +189,8 @@ def render_winget(version: str, tag: str, sums: dict[str, str]) -> dict[str, str
         "LicenseUrl": f"{HOMEPAGE}/blob/main/LICENSE",
         "ShortDescription": DESCRIPTION,
         "Description": (
-            "berth provisions lightweight, isolated local workspaces for parallel agent "
-            "programming, combining Git worktrees, private data directories, dynamic port "
+            "berth provisions lightweight, isolated local workspaces for parallel coding "
+            "agents, combining Git worktrees, private data directories, dynamic port "
             "assignment and supervised processes without virtual machine overhead."
         ),
         "Moniker": "berth",

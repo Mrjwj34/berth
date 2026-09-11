@@ -1,6 +1,6 @@
 ---
 name: berth
-description: Manage independent local agent workspaces, explicit native/container runtimes, managed processes and safe cleanup. Use for parallel task worktrees, port allocation, starting or inspecting task services, running tests inside a workspace, or reclaiming workspace state.
+description: Manage independent local workspaces for parallel coding agents: one worktree per task, explicit native/container runtimes, managed processes and safe cleanup. Use for parallel task worktrees, port allocation, starting or inspecting task services, running tests inside a workspace, or reclaiming workspace state.
 ---
 
 # berth

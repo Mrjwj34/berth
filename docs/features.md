@@ -1,6 +1,6 @@
 # Features and Configuration Guide
 
-berth is a developer tool designed to manage parallel development environments on a local machine. It allows multiple software agents or human developers to work on separate tasks concurrently without port collisions, state corruption, or heavy virtual machine overhead.
+berth is a developer tool designed to manage parallel coding agents on a local machine. It allows multiple software agents or human developers to work on separate tasks concurrently without port collisions, state corruption, or heavy virtual machine overhead.
 
 This guide provides a comprehensive walkthrough of berth concepts, configuration syntax, practical examples, and commands.
 

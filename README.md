@@ -20,7 +20,7 @@
   English | <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-berth provisions lightweight, isolated local workspaces for parallel agent programming, combining Git worktrees, private data directories, dynamic port assignment, and supervised processes without virtual machine overhead. Every workspace is a self-contained development environment — its own branch, its own data, its own ports, its own supervised processes — created in milliseconds, with no background daemon.
+berth provisions lightweight, isolated local workspaces for parallel coding agents, combining Git worktrees, private data directories, dynamic port assignment, and supervised processes without virtual machine overhead. Every workspace is a self-contained development environment — its own branch, its own data, its own ports, its own supervised processes — created in milliseconds, with no background daemon.
 
 <p align="center">
   <img src="https://cdn.jwjbox.dev/berth-demo.gif" alt="berth creates an isolated workspace and starts its declared services" width="760" />
