@@ -1,0 +1,41 @@
+package config
+
+const Template = `# lane.yaml — isolation primitives only. lane does not know any datastore.
+# Agent onboarding: read SKILL.md, make ports/data-dir env-driven, then
+#   lane new smoke --up
+# and commit this file once the smoke workspace is healthy.
+version: 1
+base: main                                   # baseline branch; created branches use prefix lane/
+
+# Named ports become LANE_PORT_<NAME> (name uppercased, '-' -> '_').
+# ports: [web, api]
+
+# env:
+#   PORT: ${LANE_PORT_API}
+#   DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app
+
+# Optional dotenv managed block (# BEGIN LANE ... # END LANE)
+# env_file: .env.local
+
+# Fast clone/hardlink/copy from the main worktree after git checkout.
+# copy_dirs:
+#   - node_modules
+
+hooks:
+  setup: []
+  teardown: []
+
+# process-compose syntax, passed through. Commands see every LANE_* variable.
+# processes:
+#   api:
+#     command: go run ./cmd/server
+#     readiness_probe:
+#       http_get:
+#         port: "${LANE_PORT_API}"
+#         path: /healthz
+
+gc:
+  idle_stop_hours: 4
+  remove_after_days: 7
+  max_workspaces: 8
+`

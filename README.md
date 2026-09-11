@@ -93,6 +93,7 @@ env:
   VITE_API_URL: http://127.0.0.1:${LANE_PORT_API}
 
 env_file: .env.local                         # 可选：导出托管块供 Vite 等前端工具读取
+copy_dirs: [node_modules]                    # 从主工作树硬链接/clonefile 复用依赖
 
 hooks:
   setup:
@@ -125,15 +126,19 @@ gc:
 
 ---
 
+组件配方见 [docs/recipes](./docs/recipes)：Postgres、MySQL、Redis、Elasticsearch、SQLite 与 Docker 都只是普通进程。默认工作区路径为仓库旁的 `<reponame>.lanes/<slug>`，全局状态在 `$LANE_HOME/state.json`（默认 `~/.lane/state.json`）。
+
 ## 常用命令一览
 
 | 命令 | 描述 |
 | :--- | :--- |
+| `lane` | 全局工作区总览（无子命令） |
 | `lane init` | 在当前仓库生成带注释的 `lane.yaml` 模板并安装配套 Skill |
-| `lane skill install` | 将内嵌的 `SKILL.md` 分发到 `.agents/skills/lane/` 与 `.claude/skills/lane/` |
+| `lane skill install` | 将内嵌的 `SKILL.md` 分发到 `.agents` / `.claude` / `.cursor` 的 `skills/lane/` |
 | `lane hook install [harness]` | 安装 Cursor (`worktrees.json`) 或 Claude Code 钩子适配 |
 | `lane new <slug> [--up]` | 基于基线分支创建独立 worktree，分配端口块并可选启动进程 |
-| `lane attach [slug]` | 切换进入指定工作区环境 |
+| `lane attach [slug]` | 打印工作区路径与 `LANE_*` 导出语句 |
+| `lane adopt [--setup]` | 将当前目录（Cursor/Claude 已建 worktree）登记为 lane 工作区 |
 | `lane ls [--json]` | 列出所有工作区状态、分支、端口分布与进程存活情况 |
 | `lane status [--json]` | 查看当前工作区的进程状态与就绪探针信息 |
 | `lane ports [--json]` | 查看当前工作区分配的专用端口映射表 |
@@ -143,24 +148,25 @@ gc:
 | `lane reset` | 停止进程，重置 `$LANE_DATA_DIR` 并重新执行 `hooks.setup` |
 | `lane done [slug] [--force]` | 验证代码已提交推送后安全销毁工作区、释放端口与清理分支 |
 | `lane gc [--dry-run]` | 扫描并回收残留端口、停机空闲工作区与清理已合并目录 |
+| `lane open [port-name]` | 用系统浏览器打开已分配的 HTTP 端口 |
 | `lane doctor [--fix]` | 诊断依赖工具链（git / process-compose）与环境健康度 |
 
 ---
 
 ## 开发与演进路线
 
-- **M1: 核心原语与 MVP 骨架（当前阶段）**
+- **M1: 核心原语与 MVP 骨架**
   - [x] 仓库骨架搭建、基础 CI、规范制定与远程仓库创建
-  - [ ] L0 Worktree 生命周期（`new/attach/ls/done` + `.worktreeinclude`）
-  - [ ] L1 `lane.yaml` 解析、端口块动态分配、环境变量派生与钩子运行
-  - [ ] L2 进程直通 process-compose（自动下载钉死版本、就绪探针与状态监控）
-  - [ ] 内嵌 `SKILL.md` 与 `lane init`
-  - [ ] 常见组件配方手册（Postgres / MySQL / Redis / ES / SQLite）
+  - [x] L0 Worktree 生命周期（`new/attach/adopt/ls/done` + `.worktreeinclude`）
+  - [x] L1 `lane.yaml` 解析、端口块动态分配、环境变量派生与钩子运行
+  - [x] L2 进程直通 process-compose（自动下载钉死版本、就绪探针与状态监控）
+  - [x] 内嵌 `SKILL.md` 与 `lane init`
+  - [x] 常见组件配方手册（Postgres / MySQL / Redis / ES / SQLite / Docker）
 - **M2: 自动化与体验打磨**
-  - 完整 GC 策略（空闲停机、已合并清理、最大配额淘汰）
-  - `copy_dirs` 秒级依赖复用（硬链接/clonefile 复制 `node_modules` 等）
-  - 全局总览面板与 `lane open` 快速打开浏览器
-  - Windows 原生与 WSL2 跨平台调优
+  - [x] 完整 GC 策略（空闲停机、已合并清理、最大配额淘汰）
+  - [x] `copy_dirs` 秒级依赖复用（硬链接/clonefile 复制 `node_modules` 等）
+  - [x] 全局总览面板与 `lane open` 快速打开浏览器
+  - [x] Windows 原生（process-compose TCP）与 WSL2（Linux 路径）跨平台处理
 - **M3: 开源发布与生态采用**
   - Homebrew Tap / Scoop / `go install` 安装分发
   - 真实重度项目接入切换与端到端回归

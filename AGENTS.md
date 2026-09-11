@@ -47,14 +47,18 @@ Go 检查范围限定在 `cmd` 和 `internal`，避免扫描非项目代码。
 - **以目录为身份**：工具以目录路径作为工作区核心身份凭证，与外部工具（Cursor/Claude 手动创建或删除的 worktree）天然兼容，并能自动回收"目录已消失"的残留端口与后台进程。
 
 ### 2. 包职责划分
-- `cmd/lane/`: 纯 CLI 交互层（基于 cobra 或 flag），负责解析命令行参数、组织输入输出（stdout/stderr）、格式化 `--json` 与退出码，严禁内嵌复杂业务逻辑。
+- `cmd/lane/`: 纯 CLI 交互层（cobra），负责解析命令行参数、组织输入输出（stdout/stderr）、格式化 `--json` 与退出码，严禁内嵌复杂业务逻辑。
+- `internal/app`: 工作区生命周期编排（new/adopt/up/done/gc 等），组装各原语包。
+- `internal/home`: `$LANE_HOME`（默认 `~/.lane`）路径解析，供测试隔离真实用户状态。
 - `internal/config`: `lane.yaml` 解析、校验、默认值注入与 `${LANE_*}` 环境变量派生。
 - `internal/worktree`: 封装 `git` worktree 创建、挂载、删除及 `.worktreeinclude` 规则拷贝。
-- `internal/ports`: 机器级端口块分配、状态记录与动态可用性探测。
-- `internal/state`: 全局状态管理（`~/.lane/state.json`），**必须使用文件锁（File Lock）与原子写入（Atomic Write）**，杜绝多 Agent 并发操作冲突。
-- `internal/process`: 进程编排桥接，负责生成 `.lane/pc.yaml`，通过 `process-compose up -D -t=false` 托管进程，并管理健康探测与日志。
+- `internal/copyfs`: `copy_dirs` 的 clonefile / 硬链接 / 普通复制。
+- `internal/ports`: 机器级端口块分配与 bind 探测。
+- `internal/state`: 全局状态管理（`$LANE_HOME/state.json`），**必须使用文件锁（File Lock）与原子写入（Atomic Write）**，杜绝多 Agent 并发操作冲突。
+- `internal/process`: 进程编排桥接，负责生成 `.lane/pc.yaml`，自动拉取钉死版本的 process-compose，并通过 `process-compose up -D -t=false` 托管进程。
 - `internal/gc`: 垃圾回收状态机（已删除目录回收、空闲停机、已合入分支自动清理、工作区配额上限淘汰）。
-- `internal/skill`: 内嵌 `SKILL.md` 文件资产分发与安装。
+- `internal/skill`: 内嵌 `SKILL.md` 与可选 harness hook 资产分发。
+- `internal/gitx`: 带 `context.Context` 的 git 命令封装。
 
 ---
 
