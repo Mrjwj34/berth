@@ -1,6 +1,6 @@
 # Repository development rules
 
-lane provides efficient, low-cost local environments for parallel agent
+berth provides efficient, low-cost local environments for parallel agent
 programming. Preserve the native fast path and explicit reusable Linux-container
 backend. Do not reintroduce transparent syscall interception as a universal
 isolation promise. No per-command image builds, implicit image pulls or silent
@@ -44,10 +44,10 @@ go vet ./cmd/... ./internal/...
 go test ./cmd/... ./internal/...
 go test -race ./cmd/... ./internal/...
 go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./cmd/... ./internal/...
-go build ./cmd/lane
+go build ./cmd/berth
 ```
 
-Filesystem/Git tests use t.TempDir and isolated LANE_HOME. Tests involving registry
+Filesystem/Git tests use t.TempDir and isolated BERTH_HOME. Tests involving registry
 allocation must cover independent CLI processes, not just go test -race. Claimed
 platform capabilities require execution tests; skipped tests and cross-compilation
 are not equivalent to native/desktop-runtime validation. Run the real container

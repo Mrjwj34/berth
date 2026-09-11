@@ -2,8 +2,8 @@ package runner
 
 import (
 	"context"
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/state"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/state"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,7 +12,7 @@ import (
 func fixture(t *testing.T) *Session {
 	t.Helper()
 	root := t.TempDir()
-	r := config.Runtime{Backend: "container", Image: "lane-test:local", Memory: "1g", CPUs: 2}
+	r := config.Runtime{Backend: "container", Image: "berth-test:local", Memory: "1g", CPUs: 2}
 	ws := state.Workspace{ID: "0123456789abcdef", Slug: "test", Path: filepath.Join(root, "worktree"), GitDir: filepath.Join(root, "repo", ".git", "worktrees", "test"), Ports: map[string]int{"web": 20100}, Listen: map[string]int{"web": 30000}, Runtime: r}
 	s, err := New(&config.Config{Ports: []string{"web"}, Listen: ws.Listen, Runtime: r}, ws)
 	if err != nil {
@@ -36,10 +36,10 @@ func TestCreateArgumentsAndEnv(t *testing.T) {
 		t.Fatal("excessive runtime privileges")
 	}
 	env, host := s.Env(), s.HostEnv()
-	if env["LANE_PORT_WEB"] != "30000" || env["LANE_HOST_PORT_WEB"] != "20100" || host["LANE_PORT_WEB"] != "20100" {
+	if env["BERTH_PORT_WEB"] != "30000" || env["BERTH_HOST_PORT_WEB"] != "20100" || host["BERTH_PORT_WEB"] != "20100" {
 		t.Fatal("host and internal ports conflated")
 	}
-	if env["LANE_DATA_DIR"] != "/workspace/.lane/data" || !strings.HasPrefix(env["GIT_DIR"], "/lane/git/worktrees/") {
+	if env["BERTH_DATA_DIR"] != "/workspace/.berth/data" || !strings.HasPrefix(env["GIT_DIR"], "/berth/git/worktrees/") {
 		t.Fatalf("host path leaked into container: %+v", env)
 	}
 	cmd := s.containerExec(context.Background(), []string{"sh", "-c", "echo '$HOME' && echo end"}, false)

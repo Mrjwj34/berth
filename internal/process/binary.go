@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/home"
+	"github.com/Mrjwj34/berth/internal/home"
 	"github.com/gofrs/flock"
 )
 
@@ -47,7 +47,7 @@ func LookPath() (string, error) {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("process-compose not found. Run lane doctor --fix to download %s", PinnedVersion)
+	return "", fmt.Errorf("process-compose not found. Run berth doctor --fix to download %s", PinnedVersion)
 }
 
 func Ensure(ctx context.Context) (string, error) {

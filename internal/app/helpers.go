@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/runner"
-	"github.com/Mrjwj34/lane/internal/state"
-	"github.com/Mrjwj34/lane/internal/worktree"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/runner"
+	"github.com/Mrjwj34/berth/internal/state"
+	"github.com/Mrjwj34/berth/internal/worktree"
 )
 
 func cwd() string {
@@ -87,7 +87,7 @@ func (a *App) resolve(ctx context.Context, key string) (state.Workspace, error) 
 			return best, nil
 		}
 	}
-	return state.Workspace{}, fmt.Errorf("workspace not found; run lane ls or lane adopt")
+	return state.Workspace{}, fmt.Errorf("workspace not found; run berth ls or berth adopt")
 }
 func (a *App) locked(ctx context.Context, key string, fn func(state.Workspace) error) error {
 	ws, err := a.resolve(ctx, key)
@@ -144,7 +144,9 @@ func (a *App) failure(ws state.Workspace, err error) error {
 	}
 	return err
 }
-func identityPath(ws state.Workspace) string { return filepath.Join(ws.Path, ".lane", "identity.json") }
+func identityPath(ws state.Workspace) string {
+	return filepath.Join(ws.Path, ".berth", "identity.json")
+}
 func safeDirectory(root, rel string) error {
 	cur := root
 	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
@@ -169,15 +171,15 @@ func safeDirectory(root, rel string) error {
 	return nil
 }
 func writeIdentity(ws state.Workspace) error {
-	if err := safeDirectory(ws.Path, ".lane/data"); err != nil {
+	if err := safeDirectory(ws.Path, ".berth/data"); err != nil {
 		return err
 	}
 	for _, name := range []string{"identity.json", ".gitignore"} {
-		if st, err := os.Lstat(filepath.Join(ws.Path, ".lane", name)); err == nil && !st.Mode().IsRegular() {
+		if st, err := os.Lstat(filepath.Join(ws.Path, ".berth", name)); err == nil && !st.Mode().IsRegular() {
 			return fmt.Errorf("invalid metadata file: %s", name)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(ws.Path, ".lane", ".gitignore"), []byte("*\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(ws.Path, ".berth", ".gitignore"), []byte("*\n"), 0o600); err != nil {
 		return err
 	}
 	data, err := json.Marshal(struct{ ID, Repo, GitDir string }{ws.ID, ws.Repo, ws.GitDir})
@@ -191,7 +193,7 @@ func validateIdentity(ctx context.Context, ws state.Workspace) error {
 		return err
 	}
 	if ws.ID == "" || ws.GitDir == "" || ws.Ownership == "" {
-		return fmt.Errorf("legacy workspace: run lane adopt in it to register safe lifecycle identity")
+		return fmt.Errorf("legacy workspace: run berth adopt in it to register safe lifecycle identity")
 	}
 	dir, err := gitx.Run(ctx, ws.Path, "rev-parse", "--absolute-git-dir")
 	if err != nil {
@@ -207,12 +209,12 @@ func validateIdentity(ctx context.Context, ws state.Workspace) error {
 	if branch != ws.Branch {
 		return fmt.Errorf("workspace branch changed from %s to %s", ws.Branch, branch)
 	}
-	st, err := os.Lstat(filepath.Join(ws.Path, ".lane"))
+	st, err := os.Lstat(filepath.Join(ws.Path, ".berth"))
 	if err != nil {
 		return err
 	}
 	if !st.IsDir() || st.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("invalid .lane directory")
+		return fmt.Errorf("invalid .berth directory")
 	}
 	st, err = os.Lstat(identityPath(ws))
 	if err != nil {
@@ -236,7 +238,7 @@ func validateIdentity(ctx context.Context, ws state.Workspace) error {
 }
 func (a *App) session(ctx context.Context, ws state.Workspace) (*runner.Session, error) {
 	if ws.RemovalHead != "" {
-		return nil, fmt.Errorf("workspace removal is pending; retry lane done %s", ws.Path)
+		return nil, fmt.Errorf("workspace removal is pending; retry berth done %s", ws.Path)
 	}
 	if err := validateIdentity(ctx, ws); err != nil {
 		return nil, err

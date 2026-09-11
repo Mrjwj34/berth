@@ -9,10 +9,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/runner"
-	"github.com/Mrjwj34/lane/internal/state"
-	"github.com/Mrjwj34/lane/internal/worktree"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/runner"
+	"github.com/Mrjwj34/berth/internal/state"
+	"github.com/Mrjwj34/berth/internal/worktree"
 )
 
 type Action struct {
@@ -86,7 +86,7 @@ func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, sn
 		return nil
 	}
 	if w.RemovalHead != "" {
-		return fmt.Errorf("unfinished removal retained; retry lane done %s", w.Path)
+		return fmt.Errorf("unfinished removal retained; retry berth done %s", w.Path)
 	}
 	runtime := runner.Existing(w)
 	down := func() error {
@@ -144,7 +144,7 @@ func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, sn
 				return err
 			}
 		}
-		add("idle_stop", "no lane operation within configured idle period")
+		add("idle_stop", "no berth operation within configured idle period")
 		return nil
 	}
 	if running || w.Ownership != state.Owned || !w.SetupComplete {

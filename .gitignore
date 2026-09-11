@@ -11,8 +11,8 @@
 *.test
 /coverage/
 
-# lane runtime and state
-/.lane/
+# berth runtime and state
+/.berth/
 *.sock
 
 # IDE and OS

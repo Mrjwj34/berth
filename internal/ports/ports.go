@@ -24,7 +24,7 @@ func Allocate(ctx context.Context, reserved map[int]string, names []string) (map
 		}
 		port, err := nextFree(ctx, next, taken)
 		if err != nil {
-			return nil, fmt.Errorf("allocate port %q: %w. Free a port in %d-%d or stop unused workspaces with lane down / lane gc", name, err, Min, Max)
+			return nil, fmt.Errorf("allocate port %q: %w. Free a port in %d-%d or stop unused workspaces with berth down / berth gc", name, err, Min, Max)
 		}
 		out[name] = port
 		taken[port] = struct{}{}

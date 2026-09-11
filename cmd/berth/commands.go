@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Mrjwj34/lane/internal/app"
+	"github.com/Mrjwj34/berth/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -15,21 +15,21 @@ func cmdInit(asJSON *bool) *cobra.Command {
 	var force bool
 	c := &cobra.Command{
 		Use:   "init",
-		Short: "Write a commented lane.yaml and install the skill",
+		Short: "Write a commented berth.yaml and install the skill",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withApp(func(ctx context.Context, a *app.App) error {
 				if err := a.Init(ctx, force); err != nil {
 					return err
 				}
 				if *asJSON {
-					return writeJSON(cmd.OutOrStdout(), map[string]any{"ok": true, "file": "lane.yaml"})
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"ok": true, "file": "berth.yaml"})
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "wrote lane.yaml and installed .agents/skills/lane/SKILL.md. Edit ports/processes, then: lane new smoke --up")
+				fmt.Fprintln(cmd.OutOrStdout(), "wrote berth.yaml and installed .agents/skills/berth/SKILL.md. Edit ports/processes, then: berth new smoke --up")
 				return nil
 			})
 		},
 	}
-	c.Flags().BoolVar(&force, "force", false, "overwrite an existing lane.yaml")
+	c.Flags().BoolVar(&force, "force", false, "overwrite an existing berth.yaml")
 	return c
 }
 
@@ -66,7 +66,7 @@ func cmdNew(asJSON *bool) *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&up, "up", false, "start processes after setup")
-	c.Flags().StringVar(&base, "base", "", "baseline branch (default: lane.yaml base or main)")
+	c.Flags().StringVar(&base, "base", "", "baseline branch (default: berth.yaml base or main)")
 	c.Flags().BoolVar(&printPath, "print-path", false, "print only the absolute worktree path")
 	return c
 }
@@ -114,7 +114,7 @@ func cmdAdopt(asJSON *bool) *cobra.Command {
 	var setup bool
 	c := &cobra.Command{
 		Use:   "adopt",
-		Short: "Register the current git worktree as a lane workspace",
+		Short: "Register the current git worktree as a berth workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withApp(func(ctx context.Context, a *app.App) error {
 				ws, err := a.Adopt(ctx, setup)
@@ -256,7 +256,7 @@ func cmdLogs() *cobra.Command {
 func cmdRun() *cobra.Command {
 	return &cobra.Command{
 		Use:   "run [--] <cmd> [args...]",
-		Short: "Run a command with LANE_* injected",
+		Short: "Run a command with BERTH_* injected",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withApp(func(ctx context.Context, a *app.App) error {
@@ -269,7 +269,7 @@ func cmdRun() *cobra.Command {
 func cmdReset() *cobra.Command {
 	return &cobra.Command{
 		Use:   "reset [slug]",
-		Short: "Wipe LANE_DATA_DIR and rerun setup hooks",
+		Short: "Wipe BERTH_DATA_DIR and rerun setup hooks",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			slug := ""
@@ -375,13 +375,13 @@ func cmdSkill() *cobra.Command {
 	c := &cobra.Command{Use: "skill", Short: "Skill asset commands"}
 	c.AddCommand(&cobra.Command{
 		Use:   "install",
-		Short: "Install the embedded SKILL.md into .agents/skills/lane",
+		Short: "Install the embedded SKILL.md into .agents/skills/berth",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withApp(func(ctx context.Context, a *app.App) error {
 				if err := a.SkillInstall(ctx); err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "installed skill into .agents/skills/lane")
+				fmt.Fprintln(cmd.OutOrStdout(), "installed skill into .agents/skills/berth")
 				return nil
 			})
 		},

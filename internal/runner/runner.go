@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/process"
-	"github.com/Mrjwj34/lane/internal/state"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/process"
+	"github.com/Mrjwj34/berth/internal/state"
 )
 
 type Session struct {
@@ -58,7 +58,7 @@ func New(cfg *config.Config, ws state.Workspace) (*Session, error) {
 	return &Session{Config: cfg, Workspace: ws}, nil
 }
 
-// Existing controls stored runtime resources even when lane.yaml is broken.
+// Existing controls stored runtime resources even when berth.yaml is broken.
 func Existing(ws state.Workspace) *Session { return &Session{Workspace: ws} }
 func (s *Session) Plan() Plan {
 	w := s.Workspace
@@ -67,7 +67,7 @@ func (s *Session) Plan() Plan {
 		p.Engine = w.Runtime.EngineName()
 		p.Image = w.Runtime.Image
 		p.WorkingDir = "/workspace"
-		p.DataDir = "/workspace/.lane/data"
+		p.DataDir = "/workspace/.berth/data"
 		p.NetworkNamespace = true
 		p.GatewayPorts = s.gatewayPorts()
 	}
@@ -83,14 +83,14 @@ func (s *Session) env(container bool) map[string]string {
 	}
 	vars := config.IdentityVars(path, w.Slug, repo, w.Branch, ports)
 	for name, p := range w.Ports {
-		vars[strings.Replace(config.PortEnvName(name), "LANE_PORT_", "LANE_HOST_PORT_", 1)] = strconv.Itoa(p)
+		vars[strings.Replace(config.PortEnvName(name), "BERTH_PORT_", "BERTH_HOST_PORT_", 1)] = strconv.Itoa(p)
 	}
 	if container {
-		vars["LANE_DATA_DIR"] = "/workspace/.lane/data"
-		vars["GIT_DIR"] = "/lane/git/worktrees/" + filepath.Base(w.GitDir)
+		vars["BERTH_DATA_DIR"] = "/workspace/.berth/data"
+		vars["GIT_DIR"] = "/berth/git/worktrees/" + filepath.Base(w.GitDir)
 		vars["GIT_WORK_TREE"] = "/workspace"
-		vars["HOME"] = "/tmp/lane-home"
-		vars["XDG_CACHE_HOME"] = "/tmp/lane-home/.cache"
+		vars["HOME"] = "/tmp/berth-home"
+		vars["XDG_CACHE_HOME"] = "/tmp/berth-home/.cache"
 	}
 	if s.Config != nil {
 		return config.MergeEnv(vars, s.Config.Env)
@@ -105,7 +105,7 @@ func (s *Session) Prepare(ctx context.Context) error {
 }
 func (s *Session) Up(ctx context.Context) error {
 	if s.Config == nil || len(s.Config.Processes) == 0 {
-		return fmt.Errorf("no processes declared in lane.yaml")
+		return fmt.Errorf("no processes declared in berth.yaml")
 	}
 	if err := s.Prepare(ctx); err != nil {
 		return err
@@ -121,7 +121,7 @@ func (s *Session) Up(ctx context.Context) error {
 		return err
 	}
 	if !pc {
-		argv := []string{"process-compose", "up", "-D", "-t=false", "--disable-dotenv", "-U", "-u", containerSocket, "-f", "/workspace/.lane/pc.yaml", "-L", "/workspace/.lane/process-compose.log"}
+		argv := []string{"process-compose", "up", "-D", "-t=false", "--disable-dotenv", "-U", "-u", containerSocket, "-f", "/workspace/.berth/pc.yaml", "-L", "/workspace/.berth/process-compose.log"}
 		if out, err := s.containerExec(ctx, argv, false).CombinedOutput(); err != nil {
 			return fmt.Errorf("runtime process-compose up: %w\n%s", err, out)
 		}

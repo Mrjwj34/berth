@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/state"
+	"github.com/Mrjwj34/berth/internal/state"
 )
 
 func TestReclaimVanished(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	ctx := context.Background()
 	st, err := state.Open(ctx)
 	if err != nil {

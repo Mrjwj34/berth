@@ -8,7 +8,7 @@ import (
 
 func TestDirRespectsLANEHOME(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("LANE_HOME", dir)
+	t.Setenv("BERTH_HOME", dir)
 	if got := Dir(); got != dir {
 		t.Fatalf("Dir() = %q, want %q", got, dir)
 	}
@@ -27,9 +27,9 @@ func TestDirDefaultUsesHome(t *testing.T) {
 	user := t.TempDir()
 	t.Setenv("HOME", user)
 	t.Setenv("USERPROFILE", user)
-	_ = os.Unsetenv("LANE_HOME")
+	_ = os.Unsetenv("BERTH_HOME")
 	got := Dir()
-	if got != filepath.Join(user, ".lane") {
-		t.Fatalf("Dir() = %q, want %s/.lane", got, user)
+	if got != filepath.Join(user, ".berth") {
+		t.Fatalf("Dir() = %q, want %s/.berth", got, user)
 	}
 }

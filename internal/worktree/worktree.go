@@ -11,12 +11,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Mrjwj34/lane/internal/copyfs"
-	"github.com/Mrjwj34/lane/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/copyfs"
+	"github.com/Mrjwj34/berth/internal/gitx"
 )
 
 const IncludeFile = ".worktreeinclude"
-const BranchPrefix = "lane/"
+const BranchPrefix = "berth/"
 
 type Info struct {
 	Path   string
@@ -50,7 +50,7 @@ func canon(p string) (string, error) {
 func DefaultPath(repo, slug string) string {
 	parent := filepath.Dir(repo)
 	base := filepath.Base(repo)
-	return filepath.Join(parent, base+".lanes", slug)
+	return filepath.Join(parent, base+".berths", slug)
 }
 
 func ResolvePath(repo, slug, worktreeRoot string) string {
@@ -89,10 +89,10 @@ func Add(ctx context.Context, repo, path, branch, startPoint string) error {
 		return fmt.Errorf("create worktree parent: %w", err)
 	}
 	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("worktree path %s already exists. Use lane attach or choose another slug", path)
+		return fmt.Errorf("worktree path %s already exists. Use berth attach or choose another slug", path)
 	}
 	if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", startPoint); err != nil {
-		return fmt.Errorf("base branch %q not found. Set base: in lane.yaml or pass --base", startPoint)
+		return fmt.Errorf("base branch %q not found. Set base: in berth.yaml or pass --base", startPoint)
 	}
 	if _, err := gitx.Run(ctx, repo, "show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
 		_, err = gitx.Run(ctx, repo, "worktree", "add", path, branch)

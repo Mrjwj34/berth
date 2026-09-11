@@ -9,14 +9,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/copyfs"
-	"github.com/Mrjwj34/lane/internal/gc"
-	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/process"
-	"github.com/Mrjwj34/lane/internal/runner"
-	"github.com/Mrjwj34/lane/internal/state"
-	"github.com/Mrjwj34/lane/internal/worktree"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/copyfs"
+	"github.com/Mrjwj34/berth/internal/gc"
+	"github.com/Mrjwj34/berth/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/process"
+	"github.com/Mrjwj34/berth/internal/runner"
+	"github.com/Mrjwj34/berth/internal/state"
+	"github.com/Mrjwj34/berth/internal/worktree"
 )
 
 type App struct{ Store *state.Store }
@@ -96,7 +96,7 @@ func (a *App) New(ctx context.Context, slug, base string, up bool) (*WorkspaceVi
 	ws, ok := file.BySlug(repo, slug)
 	if !ok {
 		if _, err := os.Lstat(path); err == nil {
-			return nil, fmt.Errorf("existing checkout is not owned by lane; run lane adopt in %s", path)
+			return nil, fmt.Errorf("existing checkout is not owned by berth; run berth adopt in %s", path)
 		} else if !os.IsNotExist(err) {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func (a *App) Adopt(ctx context.Context, setup bool) (*WorkspaceView, error) {
 		// detached checkout, and harness-created worktrees are commonly detached.
 		// Registering one would record a branch that does not exist.
 		if branch == "HEAD" {
-			return nil, fmt.Errorf("checkout is on a detached HEAD; lane workspaces need a branch. Check out a branch, or create a lane workspace with lane new <slug>")
+			return nil, fmt.Errorf("checkout is on a detached HEAD; berth workspaces need a branch. Check out a branch, or create a berth workspace with berth new <slug>")
 		}
 		gitDir, err := gitx.Run(ctx, top, "rev-parse", "--absolute-git-dir")
 		if err != nil {
@@ -246,7 +246,7 @@ func (a *App) prepare(ctx context.Context, s *runner.Session, ws state.Workspace
 		if err := s.Destroy(ctx); err != nil {
 			return err
 		}
-		if err := safeDirectory(ws.Path, ".lane/data"); err != nil {
+		if err := safeDirectory(ws.Path, ".berth/data"); err != nil {
 			return err
 		}
 		if err := os.RemoveAll(config.DataDir(ws.Path)); err != nil {
@@ -262,7 +262,7 @@ func (a *App) prepare(ctx context.Context, s *runner.Session, ws state.Workspace
 	if err := copyfs.CopyDirs(ctx, ws.Repo, ws.Path, s.Config.CopyDirs); err != nil {
 		return err
 	}
-	if err := safeDirectory(ws.Path, ".lane/data"); err != nil {
+	if err := safeDirectory(ws.Path, ".berth/data"); err != nil {
 		return err
 	}
 	if err := a.writeEnv(s); err != nil {

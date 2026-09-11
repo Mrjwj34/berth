@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Mrjwj34/lane/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/gitx"
 )
 
 func TestValidateSlug(t *testing.T) {
@@ -34,7 +34,7 @@ func TestAddListRemove(t *testing.T) {
 	for _, info := range infos {
 		if SamePath(info.Path, path) {
 			found = true
-			if info.Branch != "lane/feat-x" {
+			if info.Branch != "berth/feat-x" {
 				t.Fatalf("branch = %s", info.Branch)
 			}
 		}
@@ -79,8 +79,8 @@ func initRepo(t *testing.T) string {
 		t.Skip("git not available")
 	}
 	run("init", "-b", "main")
-	run("config", "user.email", "lane@test")
-	run("config", "user.name", "lane")
+	run("config", "user.email", "berth@test")
+	run("config", "user.name", "berth")
 	if err := os.WriteFile(filepath.Join(dir, "README"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/runner"
-	"github.com/Mrjwj34/lane/internal/state"
-	"github.com/Mrjwj34/lane/internal/worktree"
+	"github.com/Mrjwj34/berth/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/runner"
+	"github.com/Mrjwj34/berth/internal/state"
+	"github.com/Mrjwj34/berth/internal/worktree"
 )
 
 // resumeRemoval only has authority to finish the exact removal recorded after
@@ -58,7 +58,7 @@ func (a *App) resumeRemoval(ctx context.Context, ws state.Workspace, force bool)
 	// Git's metadata must also be gone: never infer successful worktree removal
 	// from an externally deleted/moved directory or prune unrelated metadata.
 	if _, err := os.Lstat(ws.GitDir); err == nil {
-		return fmt.Errorf("worktree Git metadata remains; finish Git worktree removal before retrying lane done")
+		return fmt.Errorf("worktree Git metadata remains; finish Git worktree removal before retrying berth done")
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("inspect worktree Git metadata: %w", err)
 	}

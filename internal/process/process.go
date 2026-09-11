@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/home"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/home"
 	"gopkg.in/yaml.v3"
 )
 
@@ -41,9 +41,9 @@ type pcProcess struct {
 	Namespace     string `json:"namespace"`
 }
 
-func PCFile(worktree string) string { return filepath.Join(config.LaneDir(worktree), "pc.yaml") }
+func PCFile(worktree string) string { return filepath.Join(config.BerthDir(worktree), "pc.yaml") }
 func Socket(worktree string) string {
-	old := filepath.Join(config.LaneDir(worktree), "pc.sock")
+	old := filepath.Join(config.BerthDir(worktree), "pc.sock")
 	if _, err := os.Lstat(old); err == nil {
 		return old
 	}
@@ -56,15 +56,15 @@ func Socket(worktree string) string {
 	p := filepath.Join(base, hex.EncodeToString(sum[:8]), "pc.sock")
 	if runtime.GOOS != "windows" && len(p) >= 100 {
 		user := sha256.Sum256([]byte(home.Dir()))
-		p = filepath.Join(os.TempDir(), "lane-"+hex.EncodeToString(user[:6]), hex.EncodeToString(sum[:8])+".sock")
+		p = filepath.Join(os.TempDir(), "berth-"+hex.EncodeToString(user[:6]), hex.EncodeToString(sum[:8])+".sock")
 	}
 	return p
 }
 func LogFile(worktree string) string {
-	return filepath.Join(config.LaneDir(worktree), "process-compose.log")
+	return filepath.Join(config.BerthDir(worktree), "process-compose.log")
 }
 func PortFile(worktree string) string {
-	old := filepath.Join(config.LaneDir(worktree), "pc.port")
+	old := filepath.Join(config.BerthDir(worktree), "pc.port")
 	if _, err := os.Lstat(old); err == nil {
 		return old
 	}
@@ -106,7 +106,7 @@ func RenderAt(worktree, workingDir string, processes map[string]any, env map[str
 			if !ok {
 				return fmt.Errorf("invalid environment entry %q", text)
 			}
-			if strings.HasPrefix(key, "LANE_") || key == "GIT_DIR" || key == "GIT_WORK_TREE" {
+			if strings.HasPrefix(key, "BERTH_") || key == "GIT_DIR" || key == "GIT_WORK_TREE" {
 				return fmt.Errorf("process cannot override runtime identity %s", key)
 			}
 		}
@@ -121,7 +121,7 @@ func RenderAt(worktree, workingDir string, processes map[string]any, env map[str
 	if err != nil {
 		return fmt.Errorf("encode pc.yaml: %w", err)
 	}
-	if err := os.MkdirAll(config.LaneDir(worktree), 0o755); err != nil {
+	if err := os.MkdirAll(config.BerthDir(worktree), 0o755); err != nil {
 		return err
 	}
 	return os.WriteFile(PCFile(worktree), data, 0o600)
@@ -157,7 +157,7 @@ func expandAny(v any, env map[string]string) any {
 
 func Up(ctx context.Context, worktree string, env map[string]string, pcPort int) error {
 	if _, err := os.Stat(PCFile(worktree)); err != nil {
-		return fmt.Errorf("no generated process file at %s. Add a processes: section to lane.yaml", PCFile(worktree))
+		return fmt.Errorf("no generated process file at %s. Add a processes: section to berth.yaml", PCFile(worktree))
 	}
 	running, err := IsRunning(ctx, worktree)
 	if err != nil {
@@ -222,7 +222,7 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int)
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("process-compose up: %w\n%s\nInspect %s or run lane doctor", err, buf.String(), LogFile(worktree))
+		return fmt.Errorf("process-compose up: %w\n%s\nInspect %s or run berth doctor", err, buf.String(), LogFile(worktree))
 	}
 	return waitReady(ctx, worktree, 60*time.Second)
 }

@@ -15,9 +15,9 @@ an image digest where reproducibility matters.
 ## Execution and addresses
 
 The whole workspace's service graph, hooks, probes and one-off commands execute
-in one runtime. Container cwd is `/workspace`, data is `/workspace/.lane/data`.
+in one runtime. Container cwd is `/workspace`, data is `/workspace/.berth/data`.
 A writable bind mount carries the checkout; shared Git metadata is mounted at
-`/lane/git`. GIT_DIR/GIT_WORK_TREE point Git at the corresponding linked-worktree
+`/berth/git`. GIT_DIR/GIT_WORK_TREE point Git at the corresponding linked-worktree
 metadata. The managed HOME is private to the container. Host credentials and the
 Docker socket are not mounted automatically.
 
@@ -39,8 +39,8 @@ raising the probe threshold does not remove that deadline or bypass readiness.
 
 `ports` names host publications. `listen` specifies their original TCP port in
 container mode. Every named port requires a listen value. Internal services can
-also use undeclared ports, but lane does not dynamically discover/publish them.
-`LANE_PORT_*` means the current execution context; `LANE_HOST_PORT_*` means the
+also use undeclared ports, but berth does not dynamically discover/publish them.
+`BERTH_PORT_*` means the current execution context; `BERTH_HOST_PORT_*` means the
 host publication. Browser code running outside the container must use published
 URLs rather than blindly reusing internal localhost URLs.
 
@@ -69,7 +69,7 @@ resources while partial state is present.
 Container name and labels must match the stored workspace ID, canonical path and
 runtime specification before stop/remove. Daemon failure is not treated as
 container absence. No implicit pull, build, or native fallback occurs. Setup is
-idempotent by project responsibility: lane records completion, and retries an
+idempotent by project responsibility: berth records completion, and retries an
 incomplete setup. Projects must not assume arbitrary hook effects can be rolled
 back transactionally.
 

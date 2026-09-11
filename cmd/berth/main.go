@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/Mrjwj34/lane/internal/version"
+	"github.com/Mrjwj34/berth/internal/version"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 func main() {
 	info := version.Current(appVersion, commit, date)
 	if err := newRoot(info).Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "lane: %v\n", err)
+		fmt.Fprintf(os.Stderr, "berth: %v\n", err)
 		var code *exec.ExitError
 		if errors.As(err, &code) && code.ExitCode() > 0 {
 			os.Exit(code.ExitCode())

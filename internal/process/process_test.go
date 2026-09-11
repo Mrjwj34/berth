@@ -11,23 +11,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
+	"github.com/Mrjwj34/berth/internal/config"
 )
 
 func TestRenderExpandsAndInjectsEnv(t *testing.T) {
 	dir := t.TempDir()
 	procs := map[string]any{
 		"web": map[string]any{
-			"command": "python3 -m http.server ${LANE_PORT_WEB}",
+			"command": "python3 -m http.server ${BERTH_PORT_WEB}",
 			"readiness_probe": map[string]any{
 				"http_get": map[string]any{
-					"port": "${LANE_PORT_WEB}",
+					"port": "${BERTH_PORT_WEB}",
 					"path": "/",
 				},
 			},
 		},
 	}
-	env := map[string]string{"LANE_PORT_WEB": "20123", "LANE_WORKSPACE": dir}
+	env := map[string]string{"BERTH_PORT_WEB": "20123", "BERTH_WORKSPACE": dir}
 	if err := RenderAt(dir, dir, procs, env); err != nil {
 		t.Fatal(err)
 	}
@@ -36,34 +36,34 @@ func TestRenderExpandsAndInjectsEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(data)
-	if !strings.Contains(s, "20123") || strings.Contains(s, "${LANE_PORT_WEB}") {
+	if !strings.Contains(s, "20123") || strings.Contains(s, "${BERTH_PORT_WEB}") {
 		t.Fatalf("expansion failed:\n%s", s)
 	}
-	if !strings.Contains(s, "LANE_PORT_WEB=20123") {
+	if !strings.Contains(s, "BERTH_PORT_WEB=20123") {
 		t.Fatalf("env not injected:\n%s", s)
 	}
 }
 
 func TestUpDownSimpleHTTP(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	python := "python3"
 	if runtime.GOOS == "windows" {
 		python = "python"
 	}
 	if _, err := exec.LookPath(python); err != nil {
-		if os.Getenv("LANE_TEST_REQUIRE_NATIVE") == "1" {
+		if os.Getenv("BERTH_TEST_REQUIRE_NATIVE") == "1" {
 			t.Fatal(err)
 		}
 		t.Skip(err)
 	}
 	if _, err := Ensure(context.Background()); err != nil {
-		if os.Getenv("LANE_TEST_REQUIRE_NATIVE") == "1" {
+		if os.Getenv("BERTH_TEST_REQUIRE_NATIVE") == "1" {
 			t.Fatal(err)
 		}
 		t.Skip(err)
 	}
 	dir := t.TempDir()
-	if err := os.MkdirAll(config.LaneDir(dir), 0o755); err != nil {
+	if err := os.MkdirAll(config.BerthDir(dir), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -73,13 +73,13 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	_ = ln.Close()
 	env := map[string]string{
-		"LANE_PORT_WEB":  strconv.Itoa(port),
-		"LANE_WORKSPACE": dir,
-		"LANE_DATA_DIR":  config.DataDir(dir),
+		"BERTH_PORT_WEB":  strconv.Itoa(port),
+		"BERTH_WORKSPACE": dir,
+		"BERTH_DATA_DIR":  config.DataDir(dir),
 	}
 	procs := map[string]any{
 		"web": map[string]any{
-			"command": python + " -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
+			"command": python + " -m http.server ${BERTH_PORT_WEB} --bind 127.0.0.1",
 		},
 	}
 	if err := RenderAt(dir, dir, procs, env); err != nil {

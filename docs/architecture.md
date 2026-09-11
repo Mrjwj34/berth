@@ -4,7 +4,7 @@ Goal: low-overhead local environments for parallel agent development.
 
 ## Boundaries
 
-- `cmd/lane`: CLI parsing, JSON/text output, cancellation and exit status.
+- `cmd/berth`: CLI parsing, JSON/text output, cancellation and exit status.
 - `app`: ownership, operation locking, setup state, safe lifecycle and configuration scope.
 - `runner.Session`: the single execution context for services, run, hooks and probes.
 - `process`: native process-compose adapter, rendering, readiness and pinned binary installation.
@@ -39,7 +39,7 @@ read/execution lease is a possible later extension if measurements justify it.
 
 The registry moves from version 1 to 2. Legacy ownership stays empty until explicit
 adoption, which grants only adopted ownership. A crash after Git creates a checkout
-but before lane registers it leaves an unregistered checkout that can be adopted;
+but before berth registers it leaves an unregistered checkout that can be adopted;
 no destructive guess is made. Runtime control endpoints live outside newly created
 native checkouts. PID checks after native shutdown are only used to wait, never to
 kill a potentially reused PID. Native API tokens isolate control endpoints.

@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/process"
-	"github.com/Mrjwj34/lane/internal/state"
+	"github.com/Mrjwj34/berth/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/process"
+	"github.com/Mrjwj34/berth/internal/state"
 )
 
 func testApp(t *testing.T) (*App, string) {
 	t.Helper()
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	repo := initRepo(t)
 	old, err := os.Getwd()
 	if err != nil {
@@ -34,10 +34,10 @@ func testApp(t *testing.T) (*App, string) {
 }
 func writeConfig(t *testing.T, repo, text string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(repo, "lane.yaml"), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, "berth.yaml"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{{"add", "lane.yaml"}, {"commit", "-m", "configure runtime"}} {
+	for _, args := range [][]string{{"add", "berth.yaml"}, {"commit", "-m", "configure runtime"}} {
 		if _, err := gitx.Run(context.Background(), repo, args...); err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestQuotaGCDoesNotDeleteCleanUnpushedCommits(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(one.Path, "valuable")); err != nil {
 		t.Fatal("GC deleted unpublished work")
 	}
-	if _, err := gitx.Run(ctx, repo, "show-ref", "--verify", "refs/heads/lane/unpublished"); err != nil {
+	if _, err := gitx.Run(ctx, repo, "show-ref", "--verify", "refs/heads/berth/unpublished"); err != nil {
 		t.Fatal("GC deleted unpushed branch")
 	}
 	if err := a.Done(ctx, one.Path, false); err == nil {
@@ -137,7 +137,7 @@ func TestFailedSetupRetriesUsingWorkspaceConfiguration(t *testing.T) {
 		t.Fatalf("failure not recorded: %+v", ws)
 	}
 	// Fix only the worktree: main deliberately retains the failing configuration.
-	if err := os.WriteFile(filepath.Join(ws.Path, "lane.yaml"), []byte("version: 1\nbase: main\nports: [web]\nhooks:\n  setup: ['echo fixed > setup-result']\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(ws.Path, "berth.yaml"), []byte("version: 1\nbase: main\nports: [web]\nhooks:\n  setup: ['echo fixed > setup-result']\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.New(ctx, "retry", "main", false); err != nil {
@@ -161,7 +161,7 @@ func TestUnknownProcessStateBlocksReset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := filepath.Join(ws.Path, ".lane", "data", "valuable")
+	file := filepath.Join(ws.Path, ".berth", "data", "valuable")
 	if err := os.WriteFile(file, []byte("keep"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestFreshWorkspaceCleanAndSafeDone(t *testing.T) {
 		t.Fatal(err)
 	}
 	if status.Dirty {
-		t.Fatal("lane metadata dirties a fresh checkout")
+		t.Fatal("berth metadata dirties a fresh checkout")
 	}
 	if err := a.Done(ctx, ws.Path, false); err != nil {
 		t.Fatal(err)

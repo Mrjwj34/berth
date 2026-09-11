@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	EnvBegin = "# BEGIN LANE"
-	EnvEnd   = "# END LANE"
+	EnvBegin = "# BEGIN BERTH"
+	EnvEnd   = "# END BERTH"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 
 func PortEnvName(portName string) string {
 	var b strings.Builder
-	b.WriteString("LANE_PORT_")
+	b.WriteString("BERTH_PORT_")
 	for _, r := range portName {
 		switch {
 		case r == '-' || r == '.':
@@ -36,21 +36,21 @@ func PortEnvName(portName string) string {
 }
 
 func DataDir(worktree string) string {
-	return filepath.Join(worktree, ".lane", "data")
+	return filepath.Join(worktree, ".berth", "data")
 }
 
-func LaneDir(worktree string) string {
-	return filepath.Join(worktree, ".lane")
+func BerthDir(worktree string) string {
+	return filepath.Join(worktree, ".berth")
 }
 
 // IdentityVars are always injected for a workspace.
 func IdentityVars(worktree, slug, repo, branch string, ports map[string]int) map[string]string {
 	vars := map[string]string{
-		"LANE_DATA_DIR":  DataDir(worktree),
-		"LANE_WORKSPACE": worktree,
-		"LANE_SLUG":      slug,
-		"LANE_ROOT":      repo,
-		"LANE_BRANCH":    branch,
+		"BERTH_DATA_DIR":  DataDir(worktree),
+		"BERTH_WORKSPACE": worktree,
+		"BERTH_SLUG":      slug,
+		"BERTH_ROOT":      repo,
+		"BERTH_BRANCH":    branch,
 	}
 	for name, port := range ports {
 		vars[PortEnvName(name)] = fmt.Sprintf("%d", port)
@@ -174,7 +174,7 @@ func renderManaged(vars map[string]string) string {
 	for k := range vars {
 		keys = append(keys, k)
 	}
-	// stable order: LANE_* first then others, each group sorted
+	// stable order: BERTH_* first then others, each group sorted
 	sortStrings(keys)
 	var b strings.Builder
 	b.WriteString(EnvBegin)

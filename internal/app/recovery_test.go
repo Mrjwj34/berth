@@ -6,18 +6,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Mrjwj34/lane/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/gitx"
 )
 
 func TestFailedResetIsRetriedBeforeUse(t *testing.T) {
 	a, repo := testApp(t)
 	ctx := context.Background()
-	writeConfig(t, repo, "version: 1\nbase: main\nhooks:\n  setup: ['echo initialized > .lane/data/seed']\n")
+	writeConfig(t, repo, "version: 1\nbase: main\nhooks:\n  setup: ['echo initialized > .berth/data/seed']\n")
 	v, err := a.New(ctx, "reset-retry", "main", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := filepath.Join(v.Path, ".lane", "data")
+	data := filepath.Join(v.Path, ".berth", "data")
 	if err := os.Remove(filepath.Join(data, "seed")); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestDoneRetriesAfterBranchDeletionFailure(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			lock := filepath.Join(common, "refs", "heads", "lane", "done-retry.lock")
+			lock := filepath.Join(common, "refs", "heads", "berth", "done-retry.lock")
 			if err := os.WriteFile(lock, nil, 0o600); err != nil {
 				t.Fatal(err)
 			}

@@ -13,15 +13,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/home"
-	"github.com/Mrjwj34/lane/internal/ports"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/home"
+	"github.com/Mrjwj34/berth/internal/ports"
 	"github.com/gofrs/flock"
 )
 
 const version = 2
 
-const Owned = "lane-created"
+const Owned = "berth-created"
 const Adopted = "adopted"
 
 // File is the on-disk machine-level registry.
@@ -52,7 +52,7 @@ type Workspace struct {
 	LastUsedAt    time.Time      `json:"last_used_at"`
 }
 
-// Store is a locked, atomically-updated view of ~/.lane/state.json.
+// Store is a locked, atomically-updated view of ~/.berth/state.json.
 type Store struct {
 	path string
 	mu   sync.Mutex
@@ -62,7 +62,7 @@ type Store struct {
 func Open(_ context.Context) (*Store, error) {
 	dir := home.Dir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create lane home %s: %w", dir, err)
+		return nil, fmt.Errorf("create berth home %s: %w", dir, err)
 	}
 	lock := flock.New(home.LockPath())
 	return &Store{path: home.StatePath(), lock: lock}, nil
@@ -127,7 +127,7 @@ func (s *Store) readUnlocked() (*File, error) {
 	}
 	var f File
 	if err := json.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("parse %s: %w. Run lane doctor --fix", s.path, err)
+		return nil, fmt.Errorf("parse %s: %w. Run berth doctor --fix", s.path, err)
 	}
 	if f.Version > version || f.Version < 0 {
 		return nil, fmt.Errorf("unsupported state version %d", f.Version)

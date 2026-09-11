@@ -1,5 +1,5 @@
 name: Bug
-description: Report something broken or unexpected in lane
+description: Report something broken or unexpected in berth
 title: "fix: "
 labels: ["fix", "bug"]
 body:
@@ -7,7 +7,7 @@ body:
     id: happened
     attributes:
       label: What happened
-      description: What did lane actually do or output?
+      description: What did berth actually do or output?
     validations:
       required: true
   - type: textarea
@@ -21,7 +21,7 @@ body:
     id: reproduce
     attributes:
       label: How to reproduce
-      description: Minimal steps, command invocations, or lane.yaml configuration.
+      description: Minimal steps, command invocations, or berth.yaml configuration.
     validations:
       required: true
   - type: textarea

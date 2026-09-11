@@ -5,7 +5,7 @@ default:
 set shell := ["sh", "-cu"]
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-bin-name := if os() == "windows" { "bin/lane.exe" } else { "bin/lane" }
+bin-name := if os() == "windows" { "bin/berth.exe" } else { "bin/berth" }
 
 # Run format and static checks
 check: _go-format-check
@@ -14,7 +14,7 @@ check: _go-format-check
 
 # Build the CLI binary
 build: _ensure-bin
-    go build -o {{bin-name}} ./cmd/lane
+    go build -o {{bin-name}} ./cmd/berth
 
 # Run tests with race detection
 test:

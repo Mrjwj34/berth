@@ -2,7 +2,7 @@ package app
 
 import (
 	"encoding/json"
-	"github.com/Mrjwj34/lane/internal/skill"
+	"github.com/Mrjwj34/berth/internal/skill"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +15,7 @@ func ensureGitignore(repo string) error {
 		return err
 	}
 	s := string(data)
-	if strings.Contains(s, ".lane/") {
+	if strings.Contains(s, ".berth/") {
 		return nil
 	}
 	var b strings.Builder
@@ -23,13 +23,13 @@ func ensureGitignore(repo string) error {
 	if s != "" && !strings.HasSuffix(s, "\n") {
 		b.WriteByte('\n')
 	}
-	b.WriteString("\n# lane workspaces\n.lane/\n")
+	b.WriteString("\n# berth workspaces\n.berth/\n")
 	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
 
 // writeCursorHook merges the Cursor adapter into .cursor/worktrees.json. Cursor
 // runs it inside every worktree it creates, so those worktrees get registered
-// with lane instead of being recreated by it.
+// with berth instead of being recreated by it.
 func writeCursorHook(repo string) error {
 	data, err := skill.Adapter("cursor.worktrees.json")
 	if err != nil {

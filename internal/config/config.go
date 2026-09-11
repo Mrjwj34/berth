@@ -14,9 +14,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const Filename = "lane.yaml"
+const Filename = "berth.yaml"
 
-var ErrNotFound = errors.New("lane.yaml not found")
+var ErrNotFound = errors.New("berth.yaml not found")
 
 type Config struct {
 	Version      int               `yaml:"version" json:"version"`
@@ -159,7 +159,7 @@ func (c *Config) validate() error {
 		return fmt.Errorf("unsupported backend %q; use native or container", c.Runtime.Backend)
 	}
 	for name, value := range c.Env {
-		if !validEnv.MatchString(name) || strings.HasPrefix(strings.ToUpper(name), "LANE_") || name == "GIT_DIR" || name == "GIT_WORK_TREE" {
+		if !validEnv.MatchString(name) || strings.HasPrefix(strings.ToUpper(name), "BERTH_") || name == "GIT_DIR" || name == "GIT_WORK_TREE" {
 			return fmt.Errorf("invalid or reserved environment key %q", name)
 		}
 		if strings.ContainsAny(value, "\x00\r\n") {
@@ -189,7 +189,7 @@ func RelativePath(p string) error {
 	if c == "." || filepath.IsAbs(p) || filepath.VolumeName(p) != "" || strings.ContainsAny(p, "\\:\x00") || c == ".." || strings.HasPrefix(c, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("%q must be a repository-relative path", p)
 	}
-	for _, protected := range []string{".git", ".lane"} {
+	for _, protected := range []string{".git", ".berth"} {
 		if c == protected || strings.HasPrefix(c, protected+string(filepath.Separator)) {
 			return fmt.Errorf("%q refers to managed metadata", p)
 		}

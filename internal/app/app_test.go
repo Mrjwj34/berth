@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/state"
+	"github.com/Mrjwj34/berth/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/state"
 )
 
 func TestNewLSDoneLifecycle(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("LANE_HOME", home)
+	t.Setenv("BERTH_HOME", home)
 	repo := initRepo(t)
 	orig, err := os.Getwd()
 	if err != nil {
@@ -38,7 +38,7 @@ func TestNewLSDoneLifecycle(t *testing.T) {
 	if _, err := os.Stat(ws.Path); err != nil {
 		t.Fatal(err)
 	}
-	if ws.Branch != "lane/feat-x" {
+	if ws.Branch != "berth/feat-x" {
 		t.Fatalf("branch = %s", ws.Branch)
 	}
 
@@ -92,7 +92,7 @@ func TestNewLSDoneLifecycle(t *testing.T) {
 }
 
 func TestGCReclaimsVanished(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	ctx := context.Background()
 	a, err := Open(ctx)
 	if err != nil {
@@ -135,12 +135,12 @@ func initRepo(t *testing.T) string {
 		}
 	}
 	run("init", "-b", "main")
-	run("config", "user.email", "lane@test")
-	run("config", "user.name", "lane")
+	run("config", "user.email", "berth@test")
+	run("config", "user.name", "berth")
 	if err := os.WriteFile(filepath.Join(dir, "README"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "lane.yaml"), []byte("version: 1\nbase: main\nports: [web]\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "berth.yaml"), []byte("version: 1\nbase: main\nports: [web]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	run("add", ".")

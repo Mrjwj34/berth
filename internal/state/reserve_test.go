@@ -11,7 +11,7 @@ import (
 )
 
 func TestReserveChild(t *testing.T) {
-	name := os.Getenv("LANE_RESERVE_HELPER")
+	name := os.Getenv("BERTH_RESERVE_HELPER")
 	if name == "" {
 		t.Skip("subprocess helper")
 	}
@@ -20,13 +20,13 @@ func TestReserveChild(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	_, err = st.Reserve(context.Background(), Workspace{ID: name, Slug: name, Path: filepath.Join(os.Getenv("LANE_HOME"), name), Repo: "repo"}, []string{"web", "db"})
+	_, err = st.Reserve(context.Background(), Workspace{ID: name, Slug: name, Path: filepath.Join(os.Getenv("BERTH_HOME"), name), Repo: "repo"}, []string{"web", "db"})
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 func TestReserveAcrossProcesses(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +36,7 @@ func TestReserveAcrossProcesses(t *testing.T) {
 	var cmds []*exec.Cmd
 	for i := 0; i < 8; i++ {
 		cmd := exec.CommandContext(ctx, exe, "-test.run=^TestReserveChild$")
-		cmd.Env = append(os.Environ(), fmt.Sprintf("LANE_RESERVE_HELPER=ws-%d", i))
+		cmd.Env = append(os.Environ(), fmt.Sprintf("BERTH_RESERVE_HELPER=ws-%d", i))
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +61,7 @@ func TestReserveAcrossProcesses(t *testing.T) {
 	}
 }
 func TestLegacyOwnershipIsNotUpgraded(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	st, err := Open(context.Background())
 	if err != nil {
 		t.Fatal(err)

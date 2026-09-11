@@ -5,17 +5,17 @@ import (
 	"path/filepath"
 )
 
-// Dir returns the machine-level lane home directory.
-// LANE_HOME overrides the default ~/.lane so tests never touch the user profile.
+// Dir returns the machine-level berth home directory.
+// BERTH_HOME overrides the default ~/.berth so tests never touch the user profile.
 func Dir() string {
-	if v := os.Getenv("LANE_HOME"); v != "" {
+	if v := os.Getenv("BERTH_HOME"); v != "" {
 		return v
 	}
 	user, err := os.UserHomeDir()
 	if err != nil || user == "" {
-		return ".lane"
+		return ".berth"
 	}
-	return filepath.Join(user, ".lane")
+	return filepath.Join(user, ".berth")
 }
 
 func StatePath() string { return filepath.Join(Dir(), "state.json") }

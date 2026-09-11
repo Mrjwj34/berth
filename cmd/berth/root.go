@@ -7,15 +7,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Mrjwj34/lane/internal/app"
-	"github.com/Mrjwj34/lane/internal/version"
+	"github.com/Mrjwj34/berth/internal/app"
+	"github.com/Mrjwj34/berth/internal/version"
 	"github.com/spf13/cobra"
 )
 
 func newRoot(info version.Info) *cobra.Command {
 	var asJSON bool
 	root := &cobra.Command{
-		Use:           "lane",
+		Use:           "berth",
 		Short:         "Project-agnostic, harness-agnostic workspace runner for AI agents",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -78,7 +78,7 @@ func cmdVersion(info version.Info) *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "lane %s (commit: %s, date: %s)\n", info.Version, info.Commit, info.Date)
+			fmt.Fprintf(cmd.OutOrStdout(), "berth %s (commit: %s, date: %s)\n", info.Version, info.Commit, info.Date)
 		},
 	}
 }

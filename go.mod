@@ -1,4 +1,4 @@
-module github.com/Mrjwj34/lane
+module github.com/Mrjwj34/berth
 
 go 1.25
 

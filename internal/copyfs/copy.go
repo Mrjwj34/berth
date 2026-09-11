@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Mrjwj34/lane/internal/config"
+	"github.com/Mrjwj34/berth/internal/config"
 )
 
 // CopyDirs makes independent writable copies. CoW is an optimization; hard

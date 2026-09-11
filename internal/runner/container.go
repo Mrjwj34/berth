@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const containerSocket = "/tmp/lane-pc.sock"
+const containerSocket = "/tmp/berth-pc.sock"
 
 var validID = regexp.MustCompile(`^[a-f0-9]{16,64}$`)
 
@@ -32,7 +32,7 @@ type containerInfo struct {
 	} `json:"Config"`
 }
 
-func (s *Session) name() string { return "lane-" + s.Workspace.ID }
+func (s *Session) name() string { return "berth-" + s.Workspace.ID }
 func digest(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:])
@@ -77,7 +77,7 @@ func (s *Session) inspect(ctx context.Context) (*containerInfo, error) {
 			continue
 		}
 		labels := info.Config.Labels
-		if labels["dev.lane.workspace"] != s.Workspace.ID || labels["dev.lane.path"] != digest(s.Workspace.Path) || labels["dev.lane.spec"] != s.specHash() {
+		if labels["dev.berth.workspace"] != s.Workspace.ID || labels["dev.berth.path"] != digest(s.Workspace.Path) || labels["dev.berth.spec"] != s.specHash() {
 			return nil, fmt.Errorf("runtime ownership/configuration mismatch; refusing to control %s", s.name())
 		}
 		return &info, nil
@@ -98,7 +98,7 @@ func (s *Session) createArgs() ([]string, error) {
 			return nil, fmt.Errorf("unsupported container mount path: %s", p)
 		}
 	}
-	args := []string{"create", "--name", s.name(), "--pull=never", "--init", "--restart=no", "--label", "dev.lane.workspace=" + w.ID, "--label", "dev.lane.path=" + digest(w.Path), "--label", "dev.lane.spec=" + s.specHash(), "--security-opt", "no-new-privileges:true", "--cap-drop", "ALL", "--workdir", "/workspace", "--mount", "type=bind,src=" + w.Path + ",dst=/workspace", "--mount", "type=bind,src=" + common + ",dst=/lane/git", "--entrypoint", "bash"}
+	args := []string{"create", "--name", s.name(), "--pull=never", "--init", "--restart=no", "--label", "dev.berth.workspace=" + w.ID, "--label", "dev.berth.path=" + digest(w.Path), "--label", "dev.berth.spec=" + s.specHash(), "--security-opt", "no-new-privileges:true", "--cap-drop", "ALL", "--workdir", "/workspace", "--mount", "type=bind,src=" + w.Path + ",dst=/workspace", "--mount", "type=bind,src=" + common + ",dst=/berth/git", "--entrypoint", "bash"}
 	user := w.Runtime.User
 	if user == "" && runtime.GOOS == "linux" {
 		user = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
@@ -123,7 +123,7 @@ func (s *Session) createArgs() ([]string, error) {
 	gateways := s.gatewayPorts()
 	// Internal forwarding supports applications binding only to 127.0.0.1.
 	// Never rewrite socket syscalls; reserve gateway ports explicitly in the plan.
-	script := "set -euo pipefail\ncommand -v process-compose >/dev/null\ncommand -v socat >/dev/null\nmkdir -p /tmp/lane-home\nrm -f /tmp/lane-pc.sock\n"
+	script := "set -euo pipefail\ncommand -v process-compose >/dev/null\ncommand -v socat >/dev/null\nmkdir -p /tmp/berth-home\nrm -f /tmp/berth-pc.sock\n"
 	for _, name := range names {
 		if w.Listen[name] <= 0 {
 			return nil, fmt.Errorf("missing listen port for %s", name)
@@ -175,7 +175,7 @@ func (s *Session) ensureContainer(ctx context.Context) error {
 	}
 	child, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	out, err := s.containerExec(child, []string{"bash", "-c", "command -v process-compose && command -v socat && command -v git && test -w /workspace && mkdir -p /tmp/lane-home && git config --global --replace-all safe.directory /workspace"}, false).CombinedOutput()
+	out, err := s.containerExec(child, []string{"bash", "-c", "command -v process-compose && command -v socat && command -v git && test -w /workspace && mkdir -p /tmp/berth-home && git config --global --replace-all safe.directory /workspace"}, false).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("runtime preflight failed: %w\n%s", err, out)
 	}
@@ -202,7 +202,7 @@ func (s *Session) containerExec(ctx context.Context, argv []string, interactive 
 func (s *Session) pcRunning(ctx context.Context) (bool, error) {
 	child, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	out, err := s.containerExec(child, []string{"sh", "-c", "if test -S /tmp/lane-pc.sock; then printf yes; else printf no; fi"}, false).Output()
+	out, err := s.containerExec(child, []string{"sh", "-c", "if test -S /tmp/berth-pc.sock; then printf yes; else printf no; fi"}, false).Output()
 	if err != nil {
 		return false, err
 	}

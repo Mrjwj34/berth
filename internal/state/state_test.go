@@ -9,7 +9,7 @@ import (
 )
 
 func TestReadMissingFile(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	st, err := Open(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestReadMissingFile(t *testing.T) {
 }
 
 func TestUpdateRoundTrip(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	st, err := Open(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestUpdateRoundTrip(t *testing.T) {
 	defer st.Close()
 	ctx := context.Background()
 	if err := st.Update(ctx, func(f *File) error {
-		f.Workspaces["/tmp/ws"] = Workspace{ID: "1", Slug: "a", Path: "/tmp/ws", Repo: "/tmp/repo", Branch: "lane/a", CreatedAt: time.Now().UTC()}
+		f.Workspaces["/tmp/ws"] = Workspace{ID: "1", Slug: "a", Path: "/tmp/ws", Repo: "/tmp/repo", Branch: "berth/a", CreatedAt: time.Now().UTC()}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestUpdateRoundTrip(t *testing.T) {
 }
 
 func TestConcurrentUpdates(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	const n = 20
 	var wg sync.WaitGroup
 	wg.Add(n)

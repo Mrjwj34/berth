@@ -12,7 +12,7 @@ import (
 )
 
 func TestClientArgumentsNeverUseDefaultEndpoint(t *testing.T) {
-	t.Setenv("LANE_HOME", t.TempDir())
+	t.Setenv("BERTH_HOME", t.TempDir())
 	dir := t.TempDir()
 	if _, err := clientArgs(dir, 12345); err == nil {
 		t.Fatal("missing token silently disables authentication")
@@ -47,7 +47,7 @@ func TestClientArgumentsNeverUseDefaultEndpoint(t *testing.T) {
 
 func TestControlFilesAreWorkspaceScoped(t *testing.T) {
 	for _, suffix := range []string{"short", strings.Repeat("long", 30)} {
-		t.Setenv("LANE_HOME", filepath.Join(t.TempDir(), suffix))
+		t.Setenv("BERTH_HOME", filepath.Join(t.TempDir(), suffix))
 		root := t.TempDir()
 		a, b := filepath.Join(root, "alpha"), filepath.Join(root, "beta")
 		if Socket(a) == Socket(b) || TokenFile(a) == TokenFile(b) {

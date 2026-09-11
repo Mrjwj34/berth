@@ -1,5 +1,5 @@
 {
-  "setup-worktree-unix": ["lane adopt --setup"],
-  "setup-worktree-windows": ["lane adopt --setup"],
-  "setup-worktree": ["lane adopt --setup"]
+  "setup-worktree-unix": ["berth adopt --setup"],
+  "setup-worktree-windows": ["berth adopt --setup"],
+  "setup-worktree": ["berth adopt --setup"]
 }

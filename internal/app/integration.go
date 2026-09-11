@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/home"
-	"github.com/Mrjwj34/lane/internal/process"
-	"github.com/Mrjwj34/lane/internal/skill"
+	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/gitx"
+	"github.com/Mrjwj34/berth/internal/home"
+	"github.com/Mrjwj34/berth/internal/process"
+	"github.com/Mrjwj34/berth/internal/skill"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,9 +42,9 @@ func (a *App) SkillInstall(_ context.Context) error {
 	return skill.Install(repo)
 }
 
-// HookInstall merges lane's adapter for the requested harness into that
+// HookInstall merges berth's adapter for the requested harness into that
 // harness's own configuration file. Cursor is the only supported harness that
-// documents a worktree-creation hook, so it is the only adapter lane installs
+// documents a worktree-creation hook, so it is the only adapter berth installs
 // today; the selector stays so a future harness can be added without changing
 // the command line.
 func (a *App) HookInstall(ctx context.Context, which string) error {
@@ -160,7 +160,7 @@ func pickPort(ports map[string]int, name string) (int, error) {
 	if name != "" {
 		p, ok := ports[name]
 		if !ok {
-			return 0, fmt.Errorf("port %q is not allocated. Run lane ports --json", name)
+			return 0, fmt.Errorf("port %q is not allocated. Run berth ports --json", name)
 		}
 		return p, nil
 	}
@@ -175,7 +175,7 @@ func pickPort(ports map[string]int, name string) (int, error) {
 		}
 		return p, nil
 	}
-	return 0, fmt.Errorf("no application ports allocated. Declare ports: in lane.yaml")
+	return 0, fmt.Errorf("no application ports allocated. Declare ports: in berth.yaml")
 }
 
 func openURL(url string) error {

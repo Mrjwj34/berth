@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent bootstrap for the lane development environment.
+# Idempotent bootstrap for the berth development environment.
 # Installs the toolchain required by AGENTS.md (Go 1.25+, just, process-compose)
 # on top of Cursor's default base image, then warms the Go build/test caches.
 set -euo pipefail
@@ -48,7 +48,7 @@ install_just() {
   just --version
 }
 
-# process-compose: runtime dependency lane shells out to for L2 process supervision.
+# process-compose: runtime dependency berth shells out to for L2 process supervision.
 install_process_compose() {
   if command -v process-compose >/dev/null 2>&1 && \
      process-compose version 2>/dev/null | grep -q "${PROCESS_COMPOSE_VERSION}"; then
@@ -73,6 +73,6 @@ install_process_compose
 
 log "Warming Go module and build caches"
 go mod download
-go build -o bin/lane ./cmd/lane
+go build -o bin/berth ./cmd/berth
 
 log "Environment ready"

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/Mrjwj34/lane/internal/app"
+	"github.com/Mrjwj34/berth/internal/app"
 )
 
 func writeJSON(w io.Writer, v any) error {
@@ -42,7 +42,7 @@ func printOverview(w io.Writer, list []app.WorkspaceView, asJSON bool) error {
 		return writeJSON(w, map[string]any{"workspaces": list})
 	}
 	if len(list) == 0 {
-		fmt.Fprintln(w, "no workspaces. Run lane new <slug> or lane adopt")
+		fmt.Fprintln(w, "no workspaces. Run berth new <slug> or berth adopt")
 		return nil
 	}
 	fmt.Fprintf(w, "%-16s %-20s %-8s %-24s %s\n", "SLUG", "BRANCH", "STATUS", "PORTS", "PATH")

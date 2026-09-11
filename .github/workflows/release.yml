@@ -60,19 +60,19 @@ jobs:
           for TARGET in "${TARGETS[@]}"; do
             GOOS="${TARGET%/*}"
             GOARCH="${TARGET#*/}"
-            BIN_NAME="lane"
+            BIN_NAME="berth"
             ARCHIVE_EXT="tar.gz"
             if [ "$GOOS" = "windows" ]; then
-              BIN_NAME="lane.exe"
+              BIN_NAME="berth.exe"
               ARCHIVE_EXT="zip"
             fi
 
             OUTPUT_DIR="build_${GOOS}_${GOARCH}"
             mkdir -p "${OUTPUT_DIR}"
             echo "Building ${GOOS}/${GOARCH}..."
-            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build -ldflags "${LDFLAGS}" -o "${OUTPUT_DIR}/${BIN_NAME}" ./cmd/lane
+            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build -ldflags "${LDFLAGS}" -o "${OUTPUT_DIR}/${BIN_NAME}" ./cmd/berth
 
-            ARCHIVE_NAME="lane_${TAG#v}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}"
+            ARCHIVE_NAME="berth_${TAG#v}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}"
             if [ "$ARCHIVE_EXT" = "zip" ]; then
               (cd "${OUTPUT_DIR}" && zip -q "../dist/${ARCHIVE_NAME}" "${BIN_NAME}")
             else
@@ -88,8 +88,20 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "lane ${{ steps.vars.outputs.tag }}"
+          name: "berth ${{ steps.vars.outputs.tag }}"
           tag_name: ${{ steps.vars.outputs.tag }}
           files: |
             dist/*
           generate_release_notes: true
+
+      # Release pages are indexed and linked from package manifests, so every
+      # release carries its own install instructions.
+      - name: Append install instructions
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.vars.outputs.tag }}
+        run: |
+          gh release view "$TAG" --json body -q .body > notes.md
+          printf '\n\n---\n\n### Install\n\n```sh\n# Go\ngo install github.com/Mrjwj34/berth/cmd/berth@latest\n\n# Homebrew\nbrew install Mrjwj34/tap/berth\n\n# Scoop\nscoop bucket add berth https://github.com/Mrjwj34/scoop-bucket\nscoop install berth\n```\n\nPrebuilt binaries for Linux, macOS and Windows are attached below with `checksums.txt`.\n\nDocs: https://mrjwj34.github.io/berth/\n' >> notes.md
+          gh release edit "$TAG" --notes-file notes.md

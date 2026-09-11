@@ -19,12 +19,12 @@ func TestInstallWritesSkillUnderAgents(t *testing.T) {
 		t.Fatalf("%s too small", SkillPath(root))
 	}
 	for _, stale := range []string{
-		".claude/skills/lane/SKILL.md",
-		".cursor/skills/lane/SKILL.md",
-		".lane/hooks",
+		".claude/skills/berth/SKILL.md",
+		".cursor/skills/berth/SKILL.md",
+		".berth/hooks",
 	} {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(stale))); !os.IsNotExist(err) {
-			t.Fatalf("lane must not install outside .agents: %s", stale)
+			t.Fatalf("berth must not install outside .agents: %s", stale)
 		}
 	}
 }

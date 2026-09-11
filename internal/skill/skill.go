@@ -1,13 +1,13 @@
-// Package skill embeds the agent-facing assets lane ships: the SKILL.md that
-// teaches a coding agent how to drive lane, the reference files that body points
+// Package skill embeds the agent-facing assets berth ships: the SKILL.md that
+// teaches a coding agent how to drive berth, the reference files that body points
 // at, and the per-harness adapter files that wire a harness's own worktree
-// lifecycle into lane.
+// lifecycle into berth.
 //
-// The skill is installed to one location, .agents/skills/lane/, which every
+// The skill is installed to one location, .agents/skills/berth/, which every
 // supported harness reads (Cursor, Codex, pi, Antigravity): SKILL.md plus a
 // references/ directory the body reaches by pointer. An adapter file has to stay
 // where its harness looks for it, so adapters live beside the harness's own
-// configuration and only reference lane commands.
+// configuration and only reference berth commands.
 package skill
 
 import (
@@ -22,14 +22,14 @@ import (
 //go:embed SKILL.md references/* adapters/*
 var assets embed.FS
 
-// AgentsDir is the single directory lane installs its skill into.
+// AgentsDir is the single directory berth installs its skill into.
 const AgentsDir = ".agents"
 
 // SkillPath is the one location the embedded SKILL.md is installed to. Harnesses
-// that read .agents/skills discover it directly, so lane never writes a second
+// that read .agents/skills discover it directly, so berth never writes a second
 // copy for a harness that reads its own directory.
 func SkillPath(repoRoot string) string {
-	return filepath.Join(repoRoot, AgentsDir, "skills", "lane", "SKILL.md")
+	return filepath.Join(repoRoot, AgentsDir, "skills", "berth", "SKILL.md")
 }
 
 func Content() ([]byte, error) {
@@ -41,7 +41,7 @@ func Adapter(name string) ([]byte, error) {
 	return assets.ReadFile(filepath.ToSlash(filepath.Join("adapters", name)))
 }
 
-// Install writes the whole embedded skill into .agents/skills/lane: the body and
+// Install writes the whole embedded skill into .agents/skills/berth: the body and
 // every reference it points at, so a pointer in the body resolves on disk.
 // Adapters are not part of the skill and are written by HookInstall instead.
 func Install(repoRoot string) error {
