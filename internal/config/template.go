@@ -7,16 +7,18 @@ const Template = `# lane.yaml — isolation primitives only. lane does not know 
 version: 1
 base: main                                   # baseline branch; created branches use prefix lane/
 
-# Record the TCP ports the process already binds. lane publishes a unique
-# host port as LANE_PORT_<NAME> and remaps it — do not change the project.
+# General isolation: each workspace gets a private network. Processes keep
+# their own listen ports; lane discovers them and publishes unique host ports.
+# isolate: net
+#
+# Optional names for those host ports (LANE_PORT_API). listen: is a hint, not
+# a requirement — omit it and lane still publishes whatever is listening.
 # ports:
 #   api:
 #     listen: 8080
-#   web:
-#     listen: 5173
 #
 # Short form ports: [web, api] only allocates LANE_PORT_* for processes that
-# already accept --port / $PORT.
+# already accept --port / $PORT (no network isolation).
 
 # env:
 #   DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app

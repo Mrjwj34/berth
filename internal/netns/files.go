@@ -50,8 +50,12 @@ func fwdDir(worktree string) string {
 	return filepath.Join(config.LaneDir(worktree), "fwd")
 }
 
-func fwdSock(worktree, name string) string {
-	return filepath.Join(fwdDir(worktree), name+".sock")
+func connectSock(worktree string) string {
+	return filepath.Join(fwdDir(worktree), "connect.sock")
+}
+
+func controlSock(worktree string) string {
+	return filepath.Join(fwdDir(worktree), "control.sock")
 }
 
 func writeSpec(worktree string, s spec) error {

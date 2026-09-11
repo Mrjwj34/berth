@@ -84,7 +84,7 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err := Up(ctx, dir, env, 0, nil); err != nil {
+	if err := Up(ctx, dir, env, 0, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = Down(ctx, dir) }()
@@ -141,7 +141,7 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 	}
 	ctx := context.Background()
 	maps := []netns.Mapping{{Name: "api", Host: host, Listen: listen}}
-	if err := Up(ctx, dir, env, 0, maps); err != nil {
+	if err := Up(ctx, dir, env, 0, maps, true); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = Down(ctx, dir) }()

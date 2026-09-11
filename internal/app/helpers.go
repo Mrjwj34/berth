@@ -12,9 +12,11 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
 	"github.com/Mrjwj34/lane/internal/gitx"
+	"github.com/Mrjwj34/lane/internal/netns"
 	"github.com/Mrjwj34/lane/internal/ports"
 	"github.com/Mrjwj34/lane/internal/process"
 	"github.com/Mrjwj34/lane/internal/skill"
@@ -128,6 +130,102 @@ func (a *App) writeEnv(cfg *config.Config, ws state.Workspace) error {
 	return config.WriteEnvFile(path, env)
 }
 
+func (a *App) publishDiscovered(ctx context.Context, cfg *config.Config, ws state.Workspace) error {
+	known := map[int]struct{}{}
+	for _, p := range cfg.Ports {
+		if p.Listen > 0 {
+			known[p.Listen] = struct{}{}
+			continue
+		}
+		if host := ws.Ports[p.Name]; host > 0 {
+			known[host] = struct{}{}
+		}
+	}
+	for name := range ws.Ports {
+		if n, err := strconv.Atoi(name); err == nil {
+			known[n] = struct{}{}
+		}
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	var extra []int
+	for {
+		found, err := netns.Discover(ws.Path)
+		if err != nil {
+			return err
+		}
+		extra = extra[:0]
+		for _, lp := range found {
+			if _, ok := known[lp]; ok {
+				continue
+			}
+			extra = append(extra, lp)
+		}
+		if len(extra) > 0 || time.Now().After(deadline) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(80 * time.Millisecond):
+		}
+	}
+	if len(extra) == 0 {
+		return nil
+	}
+	names := make([]string, len(extra))
+	for i, lp := range extra {
+		names[i] = strconv.Itoa(lp)
+	}
+	allocated, err := a.allocate(ctx, names)
+	if err != nil {
+		return err
+	}
+	if err := a.Store.Update(ctx, func(f *state.File) error {
+		cur, ok := f.Workspaces[ws.Path]
+		if !ok {
+			return nil
+		}
+		if cur.Ports == nil {
+			cur.Ports = map[string]int{}
+		}
+		for name, host := range allocated {
+			cur.Ports[name] = host
+		}
+		f.Workspaces[ws.Path] = cur
+		return nil
+	}); err != nil {
+		return err
+	}
+	for _, lp := range extra {
+		name := strconv.Itoa(lp)
+		if err := netns.Publish(ws.Path, netns.Mapping{Name: name, Host: allocated[name], Listen: lp}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mergeListen(declared map[string]int, ports map[string]int) map[string]int {
+	out := map[string]int{}
+	for name, listen := range declared {
+		out[name] = listen
+	}
+	for name := range ports {
+		if out[name] > 0 {
+			continue
+		}
+		n, err := strconv.Atoi(name)
+		if err != nil || n <= 0 || n > 65535 {
+			continue
+		}
+		out[name] = n
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func workspaceEnv(cfg *config.Config, ws state.Workspace) map[string]string {
 	id := config.IdentityVars(ws.Path, ws.Slug, ws.Repo, ws.Branch, ws.Ports)
 	for _, p := range cfg.Ports {
@@ -151,7 +249,7 @@ func (a *App) view(ctx context.Context, ws state.Workspace, withEnv bool) (*Work
 		Repo:      ws.Repo,
 		Branch:    ws.Branch,
 		Ports:     ws.Ports,
-		Listen:    cfg.Ports.ListenMap(),
+		Listen:    mergeListen(cfg.Ports.ListenMap(), ws.Ports),
 		Running:   process.Running(ctx, ws.Path),
 		Dirty:     dirty,
 		CreatedAt: ws.CreatedAt,

@@ -108,7 +108,7 @@ func expandAny(v any, env map[string]string) any {
 	}
 }
 
-func Up(ctx context.Context, worktree string, env map[string]string, pcPort int, maps []netns.Mapping) error {
+func Up(ctx context.Context, worktree string, env map[string]string, pcPort int, maps []netns.Mapping, isolate bool) error {
 	if _, err := os.Stat(PCFile(worktree)); err != nil {
 		return fmt.Errorf("no generated process file at %s. Add a processes: section to lane.yaml", PCFile(worktree))
 	}
@@ -126,7 +126,7 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int,
 		"--disable-dotenv",
 		"-L", LogFile(worktree),
 	}
-	if len(maps) == 0 {
+	if !isolate {
 		args = []string{
 			"up", "-D", "-t=false",
 			"-f", PCFile(worktree),
@@ -135,8 +135,8 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int,
 		}
 	}
 	args = append(args, clientArgs(worktree, pcPort)...)
-	if len(maps) > 0 {
-		if err := netns.Start(ctx, worktree, maps, bin, args, config.Environ(os.Environ(), env)); err != nil {
+	if isolate {
+		if err := netns.Start(ctx, worktree, maps, true, bin, args, config.Environ(os.Environ(), env)); err != nil {
 			return err
 		}
 		return waitReady(ctx, worktree, 60*time.Second)

@@ -54,6 +54,15 @@ func (p Ports) NeedsIsolate() bool {
 	return false
 }
 
+// IsolateNet is the general workspace-network primitive: processes keep
+// their own listen ports; lane publishes unique host ports.
+func (c *Config) IsolateNet() bool {
+	if c == nil {
+		return false
+	}
+	return c.Isolate == "net" || c.Ports.NeedsIsolate()
+}
+
 func (p *Ports) UnmarshalYAML(value *yaml.Node) error {
 	if value == nil {
 		*p = nil

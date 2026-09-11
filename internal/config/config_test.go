@@ -105,6 +105,21 @@ ports:
 	}
 }
 
+func TestLoadIsolateNet(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, Filename)
+	if err := os.WriteFile(path, []byte("version: 1\nisolate: net\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.IsolateNet() || cfg.Isolate != "net" {
+		t.Fatalf("cfg: %+v", cfg)
+	}
+}
+
 func TestLoadListenPortListObjects(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, Filename)

@@ -19,6 +19,7 @@ type Config struct {
 	Base         string            `yaml:"base" json:"base"`
 	WorktreeRoot string            `yaml:"worktree_root,omitempty" json:"worktree_root,omitempty"`
 	Ports        Ports             `yaml:"ports" json:"ports"`
+	Isolate      string            `yaml:"isolate,omitempty" json:"isolate,omitempty"`
 	Env          map[string]string `yaml:"env" json:"env,omitempty"`
 	EnvFile      string            `yaml:"env_file,omitempty" json:"env_file,omitempty"`
 	CopyDirs     []string          `yaml:"copy_dirs,omitempty" json:"copy_dirs,omitempty"`
@@ -77,6 +78,14 @@ func Load(path string) (*Config, error) {
 func (c *Config) validate() error {
 	if c.Version != 1 {
 		return fmt.Errorf("unsupported version %d (supported: 1)", c.Version)
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Isolate)) {
+	case "", "host":
+		c.Isolate = ""
+	case "net":
+		c.Isolate = "net"
+	default:
+		return fmt.Errorf("isolate: %q is not supported (use net, or omit)", c.Isolate)
 	}
 	seen := map[string]struct{}{}
 	for _, port := range c.Ports {

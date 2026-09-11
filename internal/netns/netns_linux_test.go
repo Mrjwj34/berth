@@ -49,6 +49,47 @@ func TestTwoIsolatesSameListenPort(t *testing.T) {
 	}
 }
 
+func TestIsolateDiscoversWithoutListenMaps(t *testing.T) {
+	if !Available() {
+		t.Skip("unprivileged user+net namespaces are disabled")
+	}
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not available")
+	}
+	listen := 18081
+	if !free(listen) {
+		t.Skip("18081 is already bound on the host")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	if err := Start(ctx, dir, nil, true, "python3", []string{"-m", "http.server", strconv.Itoa(listen), "--bind", "127.0.0.1"}, os.Environ()); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = Stop(dir) }()
+	deadline := time.Now().Add(8 * time.Second)
+	var found []int
+	var err error
+	for time.Now().Before(deadline) {
+		found, err = Discover(dir)
+		if err == nil {
+			for _, p := range found {
+				if p == listen {
+					host := freePort(t)
+					if err := Publish(dir, Mapping{Name: strconv.Itoa(listen), Host: host, Listen: listen}); err != nil {
+						t.Fatal(err)
+					}
+					if get(t, host) == "" {
+						t.Fatal("discovered publish did not serve")
+					}
+					return
+				}
+			}
+		}
+		time.Sleep(80 * time.Millisecond)
+	}
+	t.Fatalf("did not discover listen %d (found %v err %v)", listen, found, err)
+}
+
 func startHTTP(t *testing.T, ctx context.Context, listen int) struct {
 	dir  string
 	host int
@@ -56,7 +97,7 @@ func startHTTP(t *testing.T, ctx context.Context, listen int) struct {
 	t.Helper()
 	dir := t.TempDir()
 	host := freePort(t)
-	err := Start(ctx, dir, []Mapping{{Name: "api", Host: host, Listen: listen}},
+	err := Start(ctx, dir, []Mapping{{Name: "api", Host: host, Listen: listen}}, true,
 		"python3", []string{"-m", "http.server", strconv.Itoa(listen), "--bind", "127.0.0.1"}, os.Environ())
 	if err != nil {
 		t.Fatal(err)

@@ -4,6 +4,7 @@ package netns
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -72,8 +73,8 @@ func Available() bool {
 	return availOK
 }
 
-func Start(ctx context.Context, worktree string, maps []Mapping, bin string, args []string, env []string) error {
-	if len(maps) == 0 {
+func Start(ctx context.Context, worktree string, maps []Mapping, isolate bool, bin string, args []string, env []string) error {
+	if !isolate {
 		return nil
 	}
 	if !Available() {
@@ -180,7 +181,7 @@ func waitStarted(ctx context.Context, worktree string, maps []Mapping) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if alive(supervisePID(worktree)) && hostPublished(maps) {
+		if isolateReady(worktree, maps) {
 			return nil
 		}
 		time.Sleep(40 * time.Millisecond)
@@ -192,6 +193,19 @@ func waitStarted(ctx context.Context, worktree string, maps []Mapping) error {
 	return fmt.Errorf("port remap supervisor did not publish host ports.%s\nInspect %s or run lane doctor", detail, isolateLogPath(worktree))
 }
 
+func isolateReady(worktree string, maps []Mapping) bool {
+	if !alive(supervisePID(worktree)) || !alive(InsidePID(worktree)) {
+		return false
+	}
+	if _, err := os.Stat(connectSock(worktree)); err != nil {
+		return false
+	}
+	if _, err := os.Stat(controlSock(worktree)); err != nil {
+		return false
+	}
+	return hostPublished(maps)
+}
+
 func hostPublished(maps []Mapping) bool {
 	for _, m := range maps {
 		c, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", m.Host), 100*time.Millisecond)
@@ -200,7 +214,26 @@ func hostPublished(maps []Mapping) bool {
 		}
 		_ = c.Close()
 	}
-	return len(maps) > 0
+	return true
+}
+
+func Publish(worktree string, m Mapping) error {
+	c, err := net.DialTimeout("unix", controlSock(worktree), time.Second)
+	if err != nil {
+		return fmt.Errorf("publish %s: %w. Is the workspace isolated? Run lane up", m.Name, err)
+	}
+	defer c.Close()
+	if err := json.NewEncoder(c).Encode(m); err != nil {
+		return err
+	}
+	var ack string
+	if err := json.NewDecoder(c).Decode(&ack); err != nil {
+		return fmt.Errorf("publish %s ack: %w", m.Name, err)
+	}
+	if ack != "ok" {
+		return fmt.Errorf("publish %s: %s", m.Name, ack)
+	}
+	return nil
 }
 
 func cleanup(worktree string) {
@@ -236,6 +269,11 @@ func runSupervise() int {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	if err := serveControl(ctx, s.Worktree); err != nil {
+		fmt.Fprintf(os.Stderr, "lane netns: control: %v\n", err)
+		_ = inside.Process.Kill()
+		return 1
+	}
 	errCh := make(chan error, 1)
 	go func() { errCh <- startHostProxies(ctx, s) }()
 
@@ -297,32 +335,102 @@ func runInside() int {
 
 func startHostProxies(ctx context.Context, s spec) error {
 	for _, m := range s.Maps {
-		ln, err := listenHost(m.Host)
-		if err != nil {
+		if err := startHostProxy(ctx, s.Worktree, m); err != nil {
 			return err
 		}
-		go serve(ctx, ln, dialUnix(fwdSock(s.Worktree, m.Name)))
 	}
 	<-ctx.Done()
 	return nil
 }
 
-func startInsideProxies(ctx context.Context, s spec) error {
-	for _, m := range s.Maps {
-		target := fmt.Sprintf("127.0.0.1:%d", m.Listen)
-		unixLn, err := listenUnix(fwdSock(s.Worktree, m.Name))
-		if err != nil {
-			return err
-		}
-		go serve(ctx, unixLn, dialTCP(target))
-		if m.Host != m.Listen {
-			hostLn, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", m.Host))
-			if err != nil {
-				return fmt.Errorf("listen isolated %d: %w", m.Host, err)
-			}
-			go serve(ctx, hostLn, dialTCP(target))
-		}
+func startHostProxy(ctx context.Context, worktree string, m Mapping) error {
+	ln, err := listenHost(m.Host)
+	if err != nil {
+		return err
 	}
+	go serve(ctx, ln, func() (net.Conn, error) {
+		c, err := dialUnix(connectSock(worktree))()
+		if err != nil {
+			return nil, err
+		}
+		if err := writeListenPort(c, m.Listen); err != nil {
+			_ = c.Close()
+			return nil, err
+		}
+		return c, nil
+	})
+	return nil
+}
+
+func serveControl(ctx context.Context, worktree string) error {
+	ln, err := listenUnix(controlSock(worktree))
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-ctx.Done()
+		_ = ln.Close()
+	}()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go handleControl(ctx, worktree, c)
+		}
+	}()
+	return nil
+}
+
+func handleControl(ctx context.Context, worktree string, c net.Conn) {
+	defer c.Close()
+	var m Mapping
+	if err := json.NewDecoder(c).Decode(&m); err != nil {
+		_ = json.NewEncoder(c).Encode(err.Error())
+		return
+	}
+	if m.Listen <= 0 || m.Host <= 0 {
+		_ = json.NewEncoder(c).Encode("host and listen ports required")
+		return
+	}
+	if err := startHostProxy(ctx, worktree, m); err != nil {
+		_ = json.NewEncoder(c).Encode(err.Error())
+		return
+	}
+	_ = json.NewEncoder(c).Encode("ok")
+}
+
+func startInsideProxies(ctx context.Context, s spec) error {
+	ln, err := listenUnix(connectSock(s.Worktree))
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-ctx.Done()
+		_ = ln.Close()
+	}()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				port, err := readListenPort(c)
+				if err != nil {
+					_ = c.Close()
+					return
+				}
+				d, err := dialTCP(fmt.Sprintf("127.0.0.1:%d", port))()
+				if err != nil {
+					_ = c.Close()
+					return
+				}
+				pipe(c, d)
+			}(c)
+		}
+	}()
 	return nil
 }
 

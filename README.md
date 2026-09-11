@@ -84,10 +84,10 @@ flowchart LR
 
 ```yaml
 version: 1
-base: main                                   # 基准基线分支，创建分支默认前缀 lane/
+base: main
+isolate: net                                 # 每工作区一张网：进程仍听自己的端口，lane 发现并发布
 
-# 声明项目已经在听的端口。lane 分配唯一宿主端口 LANE_PORT_* 并做发布，
-# 不要求应用改读 PORT / LANE_PORT_*。
+# 可选：给已发现的端口起名，供宿主侧 LANE_PORT_* / env 引用
 ports:
   web:
     listen: 5173
@@ -136,7 +136,7 @@ gc:
   max_workspaces: 8                          # 超过最大配额时淘汰最旧的干净工作区
 ```
 
-进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`，把 `$LANE_PORT_*` 传给命令。那是可选便利，不是项目改造要求。`listen:` 在 Linux 上通过 user+net namespace 隔离 bind：工作区内部 `localhost:8080` 照旧可用，宿主通过 `lane ports --json` 拿到唯一发布端口。macOS / Windows 暂不支持同一硬编码端口的并行监听。
+通用原语是 `isolate: net`（每工作区一张网），不是改项目去读 `PORT`。不写 `listen:` 时，lane 也会发现并发布正在监听的端口。`listen:` 只用来给宿主端口命名。进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`（不隔离）。Linux 用 user+net namespace 实现；macOS / Windows 没有等价的 Zero-VM 内核原语，同一硬编码端口不能并行。
 
 ---
 

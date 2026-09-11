@@ -316,7 +316,19 @@ func (a *App) Up(ctx context.Context, pathOrSlug string) error {
 		return err
 	}
 	_ = a.touch(ctx, ws.Path)
-	return process.Up(ctx, ws.Path, env, ws.Ports["pc"], process.PortMaps(cfg.Ports, ws.Ports))
+	maps, isolate := process.IsolatePlan(cfg, ws.Ports)
+	if err := process.Up(ctx, ws.Path, env, ws.Ports["pc"], maps, isolate); err != nil {
+		return err
+	}
+	if isolate {
+		if err := a.publishDiscovered(ctx, cfg, ws); err != nil {
+			return err
+		}
+		if fresh, err := a.resolve(ctx, ws.Path); err == nil {
+			_ = a.writeEnv(cfg, fresh)
+		}
+	}
+	return nil
 }
 
 func (a *App) Down(ctx context.Context, pathOrSlug string) error {

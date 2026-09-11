@@ -18,7 +18,7 @@ Do not use raw `git worktree`, process-compose, or hand-picked ports. Use this s
 When the repo has no `lane.yaml` (or it is incomplete), onboard it:
 
 1. **Read how the project starts.** Find the app, tests, and every datastore. Note every listen port and every on-disk path. Leave those ports and commands as the project wrote them.
-2. **Declare reality in `lane.yaml`, do not rewrite the app.** For each hardcoded bind (API `:8080`, Vite `5173`, …) record `listen:` so lane can isolate and publish a unique host port. Intra-workspace `localhost:8080` keeps working. Host-facing clients use `LANE_PORT_*` from `lane ports --json`. Only if a process already accepts `--port` / `$PORT` may you use the short form `ports: [api]` and pass `$LANE_PORT_API`.
+2. **Give the workspace its own network. Do not rewrite the app.** Set `isolate: net`. Processes keep binding `:8080` / `5173` / whatever they already use. Intra-workspace `localhost:8080` keeps working. lane discovers listeners and publishes unique host ports (`lane ports --json`). Optional `ports.api.listen: 8080` only names a host port as `LANE_PORT_API`. Only if a process already accepts `--port` / `$PORT` may you skip isolation and pass `$LANE_PORT_API`.
 3. **Private data only when the project shares a path across checkouts.** Point those paths at `$LANE_DATA_DIR`. Do not invent env-driven ports just so lane can start.
 4. **Write `lane.yaml`** at the repo root. Declare `ports`, `env` (URLs that *other* tools need on the host), `hooks.setup`, and `processes`. Recipes in `docs/recipes/` are ordinary processes — not first-class service types.
 5. **Self-test:** `lane new smoke --up`. Confirm readiness from JSON status/ports. Then `lane done smoke`.

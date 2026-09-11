@@ -2,6 +2,7 @@ package netns
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +10,21 @@ import (
 	"path/filepath"
 	"time"
 )
+
+func writeListenPort(c net.Conn, port int) error {
+	var b [2]byte
+	binary.BigEndian.PutUint16(b[:], uint16(port))
+	_, err := c.Write(b[:])
+	return err
+}
+
+func readListenPort(c net.Conn) (int, error) {
+	var b [2]byte
+	if _, err := io.ReadFull(c, b[:]); err != nil {
+		return 0, err
+	}
+	return int(binary.BigEndian.Uint16(b[:])), nil
+}
 
 func pipe(a, b net.Conn) {
 	defer a.Close()

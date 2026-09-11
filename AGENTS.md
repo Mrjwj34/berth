@@ -40,7 +40,7 @@ Go 检查范围限定在 `cmd` 和 `internal`，避免扫描非项目代码。
 - **一切皆进程**：工具只提供通用隔离原语，**不认识任何具体后端或中间件组件**（Postgres、MySQL、Redis、Elasticsearch、SQLite 等均由项目在 `lane.yaml` 中通过进程命令或环境变量声明）。
 - **工作区四要素**：
   1. **代码**：独立的 Git worktree。
-  2. **端口**：独立的命名端口块（`LANE_PORT_<NAME>` 为宿主发布端口）。项目若已写死监听端口，在 `lane.yaml` 用 `listen:` 声明事实；Linux 上通过 user+net namespace 隔离 bind，工具不得要求项目改读 `PORT` / `LANE_PORT_*`。
+  2. **端口 / 网络**：通用原语是每工作区一张网（`isolate: net`）。进程继续绑定项目自己的端口；`LANE_PORT_<NAME>` 是宿主发布端口。`listen:` 只是命名，不是接入条件。Linux 用 user+net namespace 实现；不得要求项目改读 `PORT` / `LANE_PORT_*`。
   3. **存储**：私有数据目录 `LANE_DATA_DIR`（默认 `<worktree>/.lane/data`），用于承载数据库文件、缓存或运行时文件，随工作区删除而自动销毁。
   4. **进程**：由项目声明的原生进程集合，直通 process-compose 监督。
 - **Harness 无关**：核心功能仅依赖 CLI + `lane.yaml` + `SKILL.md`。Cursor 的 `worktrees.json` 或 Claude Code 的 hooks 仅作为可选生成的适配层（`lane hook install`），绝不依赖任何具体编辑器或 Harness 的私有 SDK。
