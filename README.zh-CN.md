@@ -1,15 +1,20 @@
-<p>
+<p align="center">
   <a href="https://github.com/Mrjwj34/berth">
-    <img src="https://cdn.jwjbox.dev/berth.png" alt="berth logo" align="left" width="110" style="margin-right: 20px; margin-bottom: 12px;" />
+    <img src="https://cdn.jwjbox.dev/berth.png" alt="berth logo" width="140" />
   </a>
-  <span style="font-size: 1.5em; font-weight: bold; line-height: 1.3;">快速、低成本地管理并行开发环境</span><br><br>
+</p>
+
+<p align="center">
+  <strong>快速、低成本地管理并行开发环境</strong>
+</p>
+
+<p align="center">
   <a href="https://github.com/Mrjwj34/berth/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/berth/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/Mrjwj34/berth/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/berth" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/berth" alt="Go Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/berth" alt="开源许可" /></a>
   <a href="https://mrjwj34.github.io/berth/"><img src="https://img.shields.io/badge/docs-website-blue" alt="文档站" /></a>
 </p>
-<br clear="left" />
 
 <p align="center">
   <a href="README.md">English</a> | 简体中文
@@ -66,10 +71,9 @@ go build -o bin/berth ./cmd/berth
 
 ```sh
 berth init
-berth hook install all
 ```
 
-该操作会生成基础模板，把 Agent 技能安装到 `.agents/skills/berth`（Cursor、Codex、pi、Antigravity 均读取该目录），并把 Cursor 工作树适配器合并进 `.cursor/worktrees.json`。
+该操作会生成 `berth.yaml` 模板并安装 Agent 技能。宿主钩子是可选的，只有当你希望 Agent 自己创建的 worktree 被自动接管时才需要安装，详见[支持的 Agent](#支持的-agent)。
 
 ### 2. 让 Agent 自动配置 berth.yaml
 
@@ -77,27 +81,9 @@ berth hook install all
 
 > 检查当前仓库，根据现有的启动脚本、环境依赖与监听端口，自动完成 berth.yaml 配置。
 
-Agent 会自动读取内置的技能定义，分析项目文件并生成匹配的端口与进程定义。
+Agent 会自动读取已安装的技能，分析项目文件并生成匹配的端口与进程定义。
 
-如果倾向手动编写，请参阅详细功能文档中的配置指南与完整参考：[docs/features.md](docs/features.md)。
-
-### 3. 创建独立工作区并启动服务
-
-```sh
-berth new feature-a --up
-```
-
-### 4. 在工作区上下文中执行测试
-
-```sh
-berth run -- npm test
-```
-
-### 5. 开发完成并推送提交后安全销毁
-
-```sh
-berth done feature-a
-```
+如果倾向手动编写，请参阅详细功能文档中的配置指南与完整参考：[docs/features.md](docs/features.md)，其中也说明了其余流程：创建工作区（`berth new`）、在工作区内执行命令，以及如何释放工作区。
 
 ## 为什么并行的 Agent 会互相冲突
 

@@ -1,15 +1,20 @@
-<p>
+<p align="center">
   <a href="https://github.com/Mrjwj34/berth">
-    <img src="https://cdn.jwjbox.dev/berth.png" alt="berth logo" align="left" width="110" style="margin-right: 20px; margin-bottom: 12px;" />
+    <img src="https://cdn.jwjbox.dev/berth.png" alt="berth logo" width="140" />
   </a>
-  <span style="font-size: 1.5em; font-weight: bold; line-height: 1.3;">Fast, low-cost management of parallel development environments</span><br><br>
+</p>
+
+<p align="center">
+  <strong>Fast, low-cost management of parallel development environments</strong>
+</p>
+
+<p align="center">
   <a href="https://github.com/Mrjwj34/berth/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/berth/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/Mrjwj34/berth/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/berth" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/berth" alt="Go Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/berth" alt="License" /></a>
   <a href="https://mrjwj34.github.io/berth/"><img src="https://img.shields.io/badge/docs-website-blue" alt="Documentation" /></a>
 </p>
-<br clear="left" />
 
 <p align="center">
   English | <a href="README.zh-CN.md">简体中文</a>
@@ -66,10 +71,9 @@ Run initialization in your repository root:
 
 ```sh
 berth init
-berth hook install all
 ```
 
-This generates a base template, installs the agent skill to `.agents/skills/berth` for Cursor, Codex, pi and Antigravity, and merges the Cursor worktree adapter into `.cursor/worktrees.json`.
+This writes a `berth.yaml` template and installs the agent skill. Harness hooks are optional and only matter when you want worktrees created by your agent to be adopted automatically — see [Supported agents](#supported-agents).
 
 ### 2. Let your Agent configure berth.yaml
 
@@ -77,27 +81,9 @@ Prompt your coding agent:
 
 > Inspect this repository and configure berth.yaml based on existing startup scripts, toolchains, and listen ports.
 
-The agent reads the embedded skill, inspects project dependencies, and declares required ports and services automatically.
+The agent reads the installed skill, inspects project dependencies, and declares required ports and services automatically.
 
-If you prefer to configure manually, see the complete configuration guide and examples in [docs/features.md](docs/features.md).
-
-### 3. Create an isolated workspace and start services
-
-```sh
-berth new feature-a --up
-```
-
-### 4. Run tests within the workspace context
-
-```sh
-berth run -- npm test
-```
-
-### 5. Clean up after work is pushed
-
-```sh
-berth done feature-a
-```
+If you prefer to configure manually, see the complete configuration guide and examples in [docs/features.md](docs/features.md), which also documents the rest of the workflow: creating a workspace (`berth new`), running commands inside it, and releasing it again.
 
 ## Why parallel coding agents collide
 
