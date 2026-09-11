@@ -1,47 +1,22 @@
-<table>
-  <tr>
-    <td width="140" align="center" valign="middle">
-      <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" width="120" />
-    </td>
-    <td valign="middle">
-      <p><strong>Fast, low-cost management of parallel development environments</strong></p>
-      <p>
-        <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-        <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
-        <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
-        <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
-      </p>
-      <p>
-        <a href="README.zh-CN.md">简体中文</a> | English
-      </p>
-    </td>
-  </tr>
-</table>
+<p>
+  <a href="https://github.com/Mrjwj34/lane"><img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" align="left" width="90" style="margin-right: 16px;" /></a>
+  <strong>Fast, low-cost management of parallel development environments</strong><br>
+  <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
+  <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
+  <br>
+  <a href="README.zh-CN.md">简体中文</a> | English
+</p>
+<br clear="left" />
 
-## Features
+lane provisions lightweight, isolated local workspaces for parallel agent programming, combining Git worktrees, private data directories, dynamic port assignment, and supervised processes without virtual machine overhead.
 
-- Independent workspaces using Git worktrees with separate data directories, runtime configuration, and port allocations
-- Native execution mode running ordinary host processes with dynamic port assignment and process supervision
-- Container execution mode running a reusable Linux container per workspace with loopback forwarding to preserve hardcoded ports
-- Daemonless architecture relying on local file locks and state persistence without a long-running background service
-- Safe lifecycle protection preventing removal of primary checkouts, preserving unpushed commits, and safeguarding adopted workspaces
-- Built-in Agent skills and workflow integration for tools like Claude Code and Cursor
+## Install
 
-## Architecture
+Download prebuilt binaries:
 
-lane separates workspace management from the execution context. Each workspace has its own branch configuration, runtime plan, and lifecycle lock.
-
-<div align="center">
-  <img src="https://cdn.jwjbox.dev/lane-architecture.png" alt="lane architecture" width="800" />
-</div>
-
-## Quick Start
-
-### 1. Install lane
-
-Download prebuilt binaries from GitHub Releases:
-
-Linux, macOS, and Windows binaries are available on the releases page. Extract the archive and place the executable in your PATH.
+Prebuilt binaries for Linux, macOS, and Windows are available on the GitHub Releases page. Extract the archive and place the executable in your PATH.
 
 Install using Go:
 
@@ -57,26 +32,26 @@ cd lane
 go build -o bin/lane ./cmd/lane
 ```
 
-### 2. Initialize your project
+## 30-Second Quick Start
 
-Run init in the root of your Git repository:
+### 1. Initialize lane in your repository
 
 ```sh
 lane init
 lane hook install all
 ```
 
-This installs the skill definitions into your agent directories for Claude Code and Cursor, and sets up editor hooks.
+This generates a base template, installs the skill definition into agent directories for tools like Claude Code and Cursor, and configures worktree hooks.
 
-### 3. Let your Agent configure the workspace
+### 2. Let your Agent configure lane.yaml
 
 Prompt your coding agent:
 
 > Inspect this repository and configure lane.yaml based on existing startup scripts, toolchains, and listen ports.
 
-The agent reads the embedded skill, inspects project scripts and configuration files, and declares appropriate ports and processes in lane.yaml.
+The agent reads the embedded skill, inspects project dependencies, and declares required ports and services automatically.
 
-If you prefer manual configuration, edit lane.yaml directly:
+If you prefer manual configuration, declare ports and processes directly in lane.yaml:
 
 ```yaml
 version: 1
@@ -91,35 +66,55 @@ processes:
       http_get: {host: 127.0.0.1, port: "${LANE_PORT_WEB}", path: /}
 ```
 
-### 4. Create and run workspaces
-
-Prompt your agent to work in an isolated environment, or run the command directly:
+### 3. Create an isolated workspace and start services
 
 ```sh
 lane new feature-a --up
 ```
 
-View active workspaces:
-
-```sh
-lane ls --json
-lane status feature-a
-```
-
-Run tests or commands within the workspace environment:
+### 4. Run tests within the workspace context
 
 ```sh
 lane run -- npm test
 ```
 
-When work is finished and commits are pushed:
+### 5. Clean up after work is pushed
 
 ```sh
 lane done feature-a
 ```
 
-## Detailed Documentation
+## Why lane Exists
 
-- User Guide: [docs/features.md](docs/features.md) introduces practical workflows, data isolation, and agent integrations.
-- Runtime contract: [docs/runtime.md](docs/runtime.md) covers networking, port allocation, container behavior, and lifecycle guarantees.
-- Architecture decisions: [docs/architecture.md](docs/architecture.md) explains the daemonless lock model, state recovery, and safety invariants.
+When multiple software agents work on the same repository in parallel, simple branches are not enough. Running concurrent test suites or background servers immediately causes TCP port collisions, database state corruption, and leaked processes.
+
+Developers often face an awkward trade-off. Raw Git worktrees manage file trees but leave ports, databases, and background processes entirely unhandled. Manual port assignment leads to accidental commits of local port overrides. Full container stacks consume excessive memory, introduce filesystem performance penalties on macOS and Windows, and slow down agent feedback loops.
+
+lane solves this by providing a unified workspace abstraction. Each workspace receives its own linked Git checkout, private data directory, atomic port reservations, and process supervision. Operations complete in milliseconds without requiring a persistent background daemon.
+
+## Comparison with Docker, devcontainer, and Git worktree
+
+### Git worktree alone
+
+Git worktree provides isolated branches and checkouts, but offers no assistance with port allocation, database persistence, process supervision, or environment variables. Everything beyond source files must be managed manually.
+
+### Docker and devcontainer
+
+Docker and devcontainer provide complete operating system isolation. However, they come with substantial startup latency, heavy memory footprints, bind mount filesystem slowdowns on non-Linux hosts, and repetitive image rebuild overhead. They treat the entire machine environment as the boundary of isolation.
+
+### lane
+
+lane chooses a pragmatic middle path. In native mode, it runs host processes directly with zero virtualization overhead while isolating ports, data directories, and environment variables. In container mode, it reuses a single Linux container per workspace without per-command rebuilds, forwarding host traffic through loopback gateways. lane treats the workspace rather than the entire operating system as the primary unit of isolation.
+
+## Architecture
+
+lane separates workspace management from the execution context. Each workspace has its own branch configuration, runtime plan, and operation lock.
+
+<div align="center">
+  <img src="https://cdn.jwjbox.dev/lane-architecture.png" alt="lane architecture" width="800" />
+</div>
+
+Detailed documentation:
+- User Guide: [docs/features.md](docs/features.md) covers practical workflows, data isolation, and agent integrations.
+- Runtime contract: [docs/runtime.md](docs/runtime.md) explains networking, port mapping, and container execution rules.
+- Architecture decisions: [docs/architecture.md](docs/architecture.md) details the daemonless lock model, state recovery, and safety invariants.
