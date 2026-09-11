@@ -106,6 +106,14 @@ processes:
             assert json.loads(run("ls", "--json"))["workspaces"] == []
             print("PASS: native parallel workspaces, HTTP, JSON, hooks, argv, exit codes, restart, reset and cleanup")
         finally:
+            if sys.exc_info()[0] is not None:
+                for pattern in ("*.lanes/*/.lane/process-compose.log", "*.lanes/*/.lane/pc.yaml"):
+                    for diagnostic in root.glob(pattern):
+                        print(f"--- {diagnostic}\n{diagnostic.read_text(errors='replace')}", file=sys.stderr)
+                for name in names:
+                    result = subprocess.run([lane, "status", name, "--json"], cwd=repo, env=env,
+                                            capture_output=True, text=True, timeout=15)
+                    print(f"--- status {name}\n{result.stdout}\n{result.stderr}", file=sys.stderr)
             for name in names:
                 subprocess.run([lane, "done", name, "--force"], cwd=repo, env=env,
                                capture_output=True, timeout=90)
