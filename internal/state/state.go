@@ -36,6 +36,8 @@ type Workspace struct {
 	GitDir        string         `json:"git_dir,omitempty"`
 	Phase         string         `json:"phase,omitempty"`
 	SetupComplete bool           `json:"setup_complete,omitempty"`
+	ResetPending  bool           `json:"reset_pending,omitempty"`
+	RemovalHead   string         `json:"removal_head,omitempty"`
 	LastError     string         `json:"last_error,omitempty"`
 	Runtime       config.Runtime `json:"runtime,omitempty"`
 	Listen        map[string]int `json:"listen,omitempty"`

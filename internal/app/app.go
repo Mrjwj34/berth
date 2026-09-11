@@ -236,6 +236,20 @@ func (a *App) prepare(ctx context.Context, s *runner.Session, ws state.Workspace
 	if err := validateIdentity(ctx, ws); err != nil {
 		return err
 	}
+	if ws.ResetPending {
+		if err := s.Destroy(ctx); err != nil {
+			return err
+		}
+		if err := safeDirectory(ws.Path, ".lane/data"); err != nil {
+			return err
+		}
+		if err := os.RemoveAll(config.DataDir(ws.Path)); err != nil {
+			return err
+		}
+		if err := a.update(ctx, ws, func(w *state.Workspace) { w.ResetPending = false }); err != nil {
+			return err
+		}
+	}
 	if err := worktree.ApplyInclude(ctx, ws.Repo, ws.Path); err != nil {
 		return err
 	}
@@ -316,15 +330,12 @@ func (a *App) Reset(ctx context.Context, slug string) error {
 		if err != nil {
 			return err
 		}
-		if err := s.Destroy(ctx); err != nil {
-			return a.failure(ws, err)
-		}
-		if err := safeDirectory(ws.Path, ".lane/data"); err != nil {
+		// Persist intent before touching the runtime or data. All setup callers
+		// resume an interrupted reset before executing project commands.
+		if err := a.update(ctx, ws, func(w *state.Workspace) { w.SetupComplete = false; w.ResetPending = true }); err != nil {
 			return err
 		}
-		if err := os.RemoveAll(config.DataDir(ws.Path)); err != nil {
-			return err
-		}
+		ws.SetupComplete, ws.ResetPending = false, true
 		if err := a.prepare(ctx, s, ws); err != nil {
 			return a.failure(ws, err)
 		}
@@ -335,6 +346,9 @@ func (a *App) Done(ctx context.Context, slug string, force bool) error {
 	return a.locked(ctx, slug, func(ws state.Workspace) error { return a.doneLocked(ctx, ws, force) })
 }
 func (a *App) doneLocked(ctx context.Context, ws state.Workspace, force bool) error {
+	if ws.RemovalHead != "" {
+		return a.resumeRemoval(ctx, ws, force)
+	}
 	if err := validateIdentity(ctx, ws); err != nil {
 		return err
 	}
@@ -374,21 +388,21 @@ func (a *App) doneLocked(ctx context.Context, ws state.Workspace, force bool) er
 				return err
 			}
 		}
-		if err := a.record(ctx, ws, "removing", nil); err != nil {
+		head, err := gitx.Run(ctx, ws.Path, "rev-parse", "HEAD")
+		if err != nil {
 			return err
 		}
-		if err := worktree.Remove(ctx, ws.Repo, ws.Path, force); err != nil {
-			return a.failure(ws, err)
-		}
-		if err := worktree.DeleteBranch(ctx, ws.Repo, ws.Branch); err != nil {
-			return a.failure(ws, err)
-		}
-	} else {
-		// Adopted and migrated worktrees are never owned, even with --force.
-		if err := os.Remove(identityPath(ws)); err != nil && !os.IsNotExist(err) {
+		if err := a.update(ctx, ws, func(w *state.Workspace) { w.Phase = "removing"; w.RemovalHead = head; state.Touch(w) }); err != nil {
 			return err
 		}
+		ws.RemovalHead = head
+		return a.resumeRemoval(ctx, ws, force)
 	}
+	// Adopted checkouts retain all metadata and data. Unregistering is atomic;
+	// deleting their identity marker first would make failed unregisters unretryable.
+	return a.unregister(ctx, ws)
+}
+func (a *App) unregister(ctx context.Context, ws state.Workspace) error {
 	return a.Store.Update(ctx, func(f *state.File) error {
 		if cur, ok := f.Workspaces[ws.Path]; ok && cur.ID == ws.ID {
 			delete(f.Workspaces, ws.Path)

@@ -108,6 +108,8 @@ lane run -- python3 -c 'import urllib.request; print(urllib.request.urlopen("htt
 
 `new` 的初始化进度写入注册表。setup 失败后保留工作树，重试同名 `new` 或 `up` 会重试未完成的 setup。`down` 停止进程/容器但保留数据；容器下次启动复用同一实例。`reset` 确认运行环境停止后才重建数据与执行 setup。
 
+`reset` 在操作前记录待重置状态；中断后，下一次 `new/up/run` 会先完成数据重置与 setup。`done` 删除工作树后若分支删除或登记清理失败，可以重试同一命令；期间发生变化的分支不会被误删，GC 会保留恢复记录并提示显式重试。
+
 `done` 删除 lane 创建的工作树前，必须确认工作树干净，且提交已在基线或 upstream 中保存。`--force` 仅跳过内容保留检查，**不能跳过主工作树保护、身份检查或进程停止检查**。
 
 `adopt` 接管外部工具创建的 linked worktree。之后 `done` 只停止并注销运行环境，保留其工作树、数据和分支，即使指定 `--force`。主工作树不允许 adopt。旧版注册记录不会被自动授予删除权限；可在对应目录显式 `adopt` 完成安全迁移。
@@ -149,6 +151,8 @@ go vet ./cmd/... ./internal/...
 go build ./cmd/lane
 ```
 
-CI 在 Linux/macOS/Windows 运行核心与原生服务测试，并在 Linux 运行真实容器端到端测试：同端口并行、宿主回环不串线、相同 runtime 中的测试命令、Git worktree、独立数据、实例复用、取消与清理。
+CI 在 Linux/macOS/Windows 运行核心测试与真实原生 CLI 验收：并行工作区、HTTP、JSON、hooks、参数与退出码、重启、reset 和清理。Linux 另运行真实容器端到端测试：同端口并行、宿主回环不串线、相同 runtime 中的测试命令、Git worktree、独立数据、实例复用、reset、取消与清理。
+
+准备好固定版本的 process-compose（`lane doctor --fix`，并将其目录加入 PATH）后，可执行 `python tests/native_e2e.py ./lane`（Windows 使用 `./lane.exe`）。容器验收命令为 `python3 tests/container_e2e.py ./lane lane-runtime:local`，镜像按前文提前构建。
 
 macOS/Windows 的容器引擎行为还需在实际 Docker Desktop/Podman Machine 环境验收；交叉编译不是端到端验证。测试范围与边界见 [架构记录](docs/architecture.md)。

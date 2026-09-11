@@ -235,6 +235,9 @@ func validateIdentity(ctx context.Context, ws state.Workspace) error {
 	return nil
 }
 func (a *App) session(ctx context.Context, ws state.Workspace) (*runner.Session, error) {
+	if ws.RemovalHead != "" {
+		return nil, fmt.Errorf("workspace removal is pending; retry lane done %s", ws.Path)
+	}
 	if err := validateIdentity(ctx, ws); err != nil {
 		return nil, err
 	}

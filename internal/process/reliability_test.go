@@ -5,10 +5,45 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestClientArgumentsNeverUseDefaultEndpoint(t *testing.T) {
+	t.Setenv("LANE_HOME", t.TempDir())
+	dir := t.TempDir()
+	if _, err := clientArgs(dir, 12345); err == nil {
+		t.Fatal("missing token silently disables authentication")
+	}
+	if err := os.MkdirAll(filepath.Dir(TokenFile(dir)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(TokenFile(dir), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureToken(dir); err == nil {
+		t.Fatal("empty token left by an interrupted write accepted")
+	}
+	if _, err := clientArgs(dir, 12345); err == nil {
+		t.Fatal("empty token accepted by a control command")
+	}
+	if err := os.Remove(TokenFile(dir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureToken(dir); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		if _, err := clientArgs(dir, 0); err == nil {
+			t.Fatal("missing control port falls back to an unrelated default endpoint")
+		}
+	}
+	if _, err := clientArgs(dir, 12345); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestUnknownAndFailedAreNotReady(t *testing.T) {
 	for _, raw := range []string{`[{"name":"web","status":"Running","is_ready":"Unknown"}]`, `[{"name":"web","status":"Completed","exit_code":1,"is_ready":"N/A"}]`, `[]`} {

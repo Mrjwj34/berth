@@ -44,13 +44,23 @@ no destructive guess is made. Runtime control endpoints live outside newly creat
 native checkouts. PID checks after native shutdown are only used to wait, never to
 kill a potentially reused PID. Native API tokens isolate control endpoints.
 
+Recovery intent is stored in the existing workspace record, under its operation
+lock: `reset_pending` precedes runtime/data destruction; `removal_head` follows
+teardown/shutdown and precedes checkout removal. Reset retries finish the reset
+before setup. Removal retries retain repository identity checks and delete only
+the recorded commit using [Git's compare-and-delete](https://git-scm.com/docs/git-update-ref).
+GC never discards pending removal records or grants them force authority. No
+separate journal service or background recovery process is needed.
+
 ## Validation
 
 Unit/regression coverage includes independent copies, same-source copies,
 primary-checkout protection, adopted checkout preservation, clean unpublished
 commits, setup retry using branch-local config, unknown-stop safety, GC versus
 active operations, independent-process allocation, runtime argument generation,
-host/internal port semantics, strict config, checksums and readiness.
+host/internal port semantics, strict config, checksums and readiness. Recovery
+tests interrupt reset with invalid data paths and removal with real Git ref locks,
+including changed, already-deleted and checked-out branch cases.
 
 The Linux container acceptance test holds a host sentinel on the same original
 port used inside two concurrent workspaces. It verifies the host sentinel and
@@ -58,7 +68,8 @@ workspace servers do not get confused, and checks hooks, private data, Git,
 argv/shell execution, reuse across up/down, cancellation, sibling survival and
 safe removal. Missing engines/images fail this test rather than being skipped.
 
-CI runs native integration on all three hosted OSes, not just compile checks.
+CI runs native CLI acceptance on all three hosted OSes: parallel workspace
+creation, real HTTP, JSON, hooks, argv/exit codes, restart, reset and safe removal.
 Docker/Podman Desktop execution on macOS/Windows and rootless engine variations
 still require those actual environments. Benchmarks should separate cold image
 preparation, warm workspace creation, dependency copying, process readiness and

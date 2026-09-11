@@ -186,7 +186,11 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int)
 		"--disable-dotenv",
 		"-L", LogFile(worktree),
 	}
-	args = append(args, clientArgs(worktree, pcPort)...)
+	control, err := clientArgs(worktree, pcPort)
+	if err != nil {
+		return err
+	}
+	args = append(args, control...)
 	if runtime.GOOS == "windows" {
 		args = append(args[:1], args[2:]...) // omit unsupported -D
 		if pcPort <= 0 {
@@ -246,7 +250,11 @@ func Down(ctx context.Context, worktree string) error {
 	}
 	child, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	args := append([]string{"down"}, clientArgs(worktree, readPCPort(worktree))...)
+	control, err := clientArgs(worktree, readPCPort(worktree))
+	if err != nil {
+		return err
+	}
+	args := append([]string{"down"}, control...)
 	cmd := exec.CommandContext(child, bin, args...)
 	cmd.Env = pcEnviron(os.Environ())
 	out, err := cmd.CombinedOutput()
@@ -293,13 +301,17 @@ func Status(ctx context.Context, worktree string) ([]Proc, error) {
 	return queryStatus(ctx, worktree)
 }
 func queryStatus(ctx context.Context, worktree string) ([]Proc, error) {
+	control, err := clientArgs(worktree, readPCPort(worktree))
+	if err != nil {
+		return nil, err
+	}
 	bin, err := LookPath()
 	if err != nil {
 		return nil, err
 	}
 	child, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	args := append([]string{"process", "list", "-o", "json"}, clientArgs(worktree, readPCPort(worktree))...)
+	args := append([]string{"process", "list", "-o", "json"}, control...)
 	cmd := exec.CommandContext(child, bin, args...)
 	cmd.Env = pcEnviron(os.Environ())
 	out, err := cmd.Output()
@@ -323,11 +335,15 @@ func DecodeStatus(data []byte) ([]Proc, error) {
 }
 
 func Logs(ctx context.Context, worktree, name string, stdout, stderr io.Writer) error {
+	control, err := clientArgs(worktree, readPCPort(worktree))
+	if err != nil {
+		return err
+	}
 	bin, err := LookPath()
 	if err != nil {
 		return err
 	}
-	args := append([]string{"process", "logs", name}, clientArgs(worktree, readPCPort(worktree))...)
+	args := append([]string{"process", "logs", name}, control...)
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = worktree
 	cmd.Env = pcEnviron(os.Environ())
@@ -367,7 +383,7 @@ func ensureToken(worktree string) error {
 		if !st.Mode().IsRegular() {
 			return fmt.Errorf("invalid API token file")
 		}
-		return nil
+		return validateToken(path)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
@@ -389,7 +405,18 @@ func ensureToken(worktree string) error {
 func pcEnviron(base []string) []string {
 	return config.Environ(base, map[string]string{"PC_API_TOKEN": "", "PC_API_TOKEN_PATH": ""})
 }
-func clientArgs(worktree string, pcPort int) []string {
+func validateToken(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read API token: %w", err)
+	}
+	token, err := hex.DecodeString(strings.TrimSpace(string(data)))
+	if err != nil || len(token) != 32 {
+		return fmt.Errorf("invalid API token in %s; verify the supervisor is stopped before removing this file", path)
+	}
+	return nil
+}
+func clientArgs(worktree string, pcPort int) ([]string, error) {
 	var args []string
 	if runtime.GOOS != "windows" {
 		args = []string{"-U", "-u", Socket(worktree)}
@@ -397,14 +424,15 @@ func clientArgs(worktree string, pcPort int) []string {
 		if pcPort == 0 {
 			pcPort = readPCPort(worktree)
 		}
-		if pcPort > 0 {
-			args = []string{"--address", "127.0.0.1", "-p", strconv.Itoa(pcPort)}
+		if pcPort < 1 || pcPort > 65535 {
+			return nil, fmt.Errorf("invalid or missing supervisor control port in %s", PortFile(worktree))
 		}
+		args = []string{"--address", "127.0.0.1", "-p", strconv.Itoa(pcPort)}
 	}
-	if _, err := os.Stat(TokenFile(worktree)); err == nil {
-		args = append(args, "--token-file", TokenFile(worktree))
+	if err := validateToken(TokenFile(worktree)); err != nil {
+		return nil, err
 	}
-	return args
+	return append(args, "--token-file", TokenFile(worktree)), nil
 }
 
 func readPCPort(worktree string) int {

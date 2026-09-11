@@ -110,7 +110,11 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		bin, _ := LookPath()
 		debugCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		args := append([]string{"process", "list", "-o", "json"}, clientArgs(dir, readPCPort(dir))...)
+		control, controlErr := clientArgs(dir, readPCPort(dir))
+		if controlErr != nil {
+			t.Fatalf("startup: %v; control: %v", err, controlErr)
+		}
+		args := append([]string{"process", "list", "-o", "json"}, control...)
 		debug := exec.CommandContext(debugCtx, bin, args...)
 		debug.Env = pcEnviron(os.Environ())
 		out, debugErr := debug.CombinedOutput()

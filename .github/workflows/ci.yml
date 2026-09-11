@@ -52,6 +52,9 @@ jobs:
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./cmd/... ./internal/...
       - name: Build
         run: go build ./cmd/lane
+      - name: Real native CLI acceptance test (no skip)
+        shell: bash
+        run: python tests/native_e2e.py ./lane${{ runner.os == 'Windows' && '.exe' || '' }}
   container:
     runs-on: ubuntu-latest
     timeout-minutes: 15

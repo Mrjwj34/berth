@@ -128,6 +128,14 @@ processes:
             run("up", first["path"])
             assert inspect()["Id"] == original_id, "restart did not reuse the container"
             assert get(first["ports"]["web"]) == "alpha"
+            stale = Path(first["path"], ".lane", "data", "stale")
+            stale.write_text("discard on reset")
+            run("reset", first["path"])
+            assert not stale.exists()
+            assert Path(first["path"], ".lane", "data", "seed").read_text() == "alpha"
+            run("up", first["path"])
+            assert get(first["ports"]["web"]) == "alpha"
+            assert get(second["ports"]["web"]) == "beta"
             # Cancellation must stop the command's runtime, not just docker exec.
             proc = subprocess.Popen([LANE, "run", "--", "sh", "-c",
                                      "touch .lane/data/started; sleep 300"],

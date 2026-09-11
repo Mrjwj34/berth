@@ -76,6 +76,19 @@ destructive work. Cancellation of `run` in container mode stops that workspace's
 whole container; sibling services within that workspace stop too, but other
 workspaces remain running.
 
+Reset intent is persisted before changing the runtime or data. If reset fails or
+is interrupted, the next `new`, `up`, or `run` finishes the data reset before
+retrying setup. Fix the reported filesystem/engine error first; partial data is
+not treated as an initialized environment.
+
+After teardown and shutdown, `done` records the expected branch commit before
+removing the checkout. Retrying `done` can finish branch deletion and registration
+cleanup even after the checkout is gone. A replaced checkout, remaining Git
+worktree metadata, a checked-out branch or changed branch commit blocks recovery;
+`--force` does not override those checks. Branch deletion uses Git's atomic
+old-value check. GC retains these pending records and asks for an explicit `done`
+retry. Adopted workspaces retain their metadata as well as their data and branch.
+
 The runtime and repository data are not an adversarial security boundary: shared
 Git metadata is writable, user hooks are code, and explicitly supplied config may
 contain side effects. An untrusted-agent sandbox needs separate credentials,

@@ -177,12 +177,33 @@ func Remove(ctx context.Context, repo, path string, force bool) error {
 	return nil
 }
 
-func DeleteBranch(ctx context.Context, repo, branch string) error {
-	if branch == "" {
-		return nil
+func DeleteBranch(ctx context.Context, repo, branch, head string) error {
+	if branch == "" || head == "" {
+		return fmt.Errorf("branch removal requires a branch and expected commit")
 	}
-	_, err := gitx.Run(ctx, repo, "branch", "-D", "--", branch)
-	return err
+	infos, err := List(ctx, repo)
+	if err != nil {
+		return err
+	}
+	for _, info := range infos {
+		if info.Branch == branch {
+			return fmt.Errorf("branch %s is checked out at %s; preserving it", branch, info.Path)
+		}
+	}
+	ref := "refs/heads/" + branch
+	if _, err := gitx.Run(ctx, repo, "show-ref", "--verify", "--quiet", ref); err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == 1 {
+			return nil // A previous attempt already deleted the branch.
+		}
+		return err
+	}
+	// Compare-and-delete under Git's ref lock; changed branches are never removed.
+	_, err = gitx.Run(ctx, repo, "update-ref", "--no-deref", "-d", ref, head)
+	if err != nil {
+		return fmt.Errorf("delete unchanged branch %s: %w", branch, err)
+	}
+	return nil
 }
 
 func List(ctx context.Context, repo string) ([]Info, error) {

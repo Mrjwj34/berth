@@ -155,9 +155,6 @@ func TestFailedSetupRetriesUsingWorkspaceConfiguration(t *testing.T) {
 	}
 }
 func TestUnknownProcessStateBlocksReset(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Unix control endpoint fixture")
-	}
 	a, _ := testApp(t)
 	ctx := context.Background()
 	ws, err := a.New(ctx, "preserve", "main", false)
@@ -169,6 +166,9 @@ func TestUnknownProcessStateBlocksReset(t *testing.T) {
 		t.Fatal(err)
 	}
 	endpoint := process.Socket(ws.Path)
+	if runtime.GOOS == "windows" {
+		endpoint = process.PortFile(ws.Path)
+	}
 	if err := os.MkdirAll(filepath.Dir(endpoint), 0o700); err != nil {
 		t.Fatal(err)
 	}

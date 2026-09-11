@@ -85,6 +85,9 @@ func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, sn
 	if !ok || w.ID != snapshot.ID || !w.LastUsedAt.Equal(snapshot.LastUsedAt) {
 		return nil
 	}
+	if w.RemovalHead != "" {
+		return fmt.Errorf("unfinished removal retained; retry lane done %s", w.Path)
+	}
 	runtime := runner.Existing(w)
 	down := func() error {
 		if opts.Down != nil {
