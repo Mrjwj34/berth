@@ -1,25 +1,18 @@
-<a href="https://github.com/Mrjwj34/lane">
-  <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" align="left" width="130" style="margin-right: 28px; margin-bottom: 20px;" />
-</a>
-
-# 快速、低成本地管理并行开发环境
-
 <p>
+  <a href="https://github.com/Mrjwj34/lane">
+    <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" align="left" width="110" style="margin-right: 20px; margin-bottom: 12px;" />
+  </a>
+  <span style="font-size: 1.5em; font-weight: bold; line-height: 1.3;">快速、低成本地管理并行开发环境</span><br><br>
   <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
-</p>
-
-<p>
+  <br><br>
   简体中文 | <a href="README.md">English</a>
 </p>
-
 <br clear="left" />
 
 lane 为多个 Agent 并行编程快速拉起轻量、隔离的本地工作区，将 Git worktree、私有数据目录、动态端口分配以及受管进程融为一体，无需承担虚拟机的庞大开销。
-
----
 
 ## 安装
 
@@ -45,8 +38,6 @@ cd lane
 go build -o bin/lane ./cmd/lane
 ```
 
----
-
 ## 30 秒快速开始
 
 ### 1. 初始化项目
@@ -68,20 +59,7 @@ lane hook install all
 
 Agent 会自动读取内置的技能定义，分析项目文件并生成匹配的端口与进程定义。
 
-如果选择手动配置，可以直接编辑项目根目录下的 lane.yaml 文件：
-
-```yaml
-version: 1
-base: main
-ports: [web]
-env:
-  PORT: ${LANE_PORT_WEB}
-processes:
-  web:
-    command: npm run dev -- --port "$LANE_PORT_WEB"
-    readiness_probe:
-      http_get: {host: 127.0.0.1, port: "${LANE_PORT_WEB}", path: /}
-```
+如果倾向手动编写，请参阅详细功能文档中的配置指南与完整参考：[docs/features.md](docs/features.md)。
 
 ### 3. 创建独立工作区并启动服务
 
@@ -101,8 +79,6 @@ lane run -- npm test
 lane done feature-a
 ```
 
----
-
 ## 为什么存在
 
 当多个 Agent 同时在同一个代码库上并行开发时，单纯切分支远远不够。只要同时运行测试套件或启动后台服务，立刻就会遭遇本地端口冲突、数据库状态污染以及孤儿进程泄漏。
@@ -110,8 +86,6 @@ lane done feature-a
 以往开发者通常要在几种折中方案里痛苦权衡。纯 Git worktree 仅管理源码文件，对端口、数据库与后台进程完全放任不管；手动修改端口极易将本地临时配置误提交到远程仓库；而为每个工作区分裂一套完整的 Docker 虚拟机又极其消耗系统内存，且在非 Linux 宿主上存在显著的文件挂载性能损耗，拖慢 Agent 的反馈循环。
 
 lane 针对这一痛点提供了一体化的工作区抽象。每个工作区同时拥有专属的 Git linked checkout、私有数据目录、原子端口分配与进程编排能力。所有操作毫秒级完成，并且完全不依赖常驻后台守护进程。
-
----
 
 ## 和 Docker、devcontainer 以及 Git worktree 的区别
 
@@ -127,8 +101,6 @@ Docker 与 devcontainer 提供完整的操作系统级虚拟化隔离。但它�
 
 lane 选择了更务实的中间路线。在原生模式下，它直接运行宿主机普通进程，零虚拟化损耗，同时自动分区端口、数据目录和环境变量。在容器模式下，它每个工作区复用单个 Linux 容器，无需每次重新构建镜像，也不拦截底层系统调用，通过回环网关转发流量。lane 将工作区而非整个虚拟机作为核心隔离单元。
 
----
-
 ## 架构
 
 lane 将工作区生命周期管理与底层执行环境解耦。每个工作区独立维护分支配置、执行计划与操作锁。
@@ -138,6 +110,6 @@ lane 将工作区生命周期管理与底层执行环境解耦。每个工作区
 </div>
 
 详细文档导航：
-- 用户指南：[docs/features.md](docs/features.md) 介绍具体的工作流、数据隔离策略以及 Agent 工具集成
+- 用户指南：[docs/features.md](docs/features.md) 介绍完整配置参考、实用工作流以及 Agent 工具集成
 - 运行时契约：[docs/runtime.md](docs/runtime.md) 详细说明网络模式、端口映射、容器运行方式与生命周期规则
 - 架构设计记录：[docs/architecture.md](docs/architecture.md) 详细介绍无守护进程锁设计、状态恢复机制与安全不变式

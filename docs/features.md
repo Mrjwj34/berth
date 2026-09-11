@@ -1,6 +1,8 @@
-# Features and User Guide
+# Features and Configuration Guide
 
 lane is a developer tool designed to manage parallel development environments on a local machine. It allows multiple software agents or human developers to work on separate tasks concurrently without port collisions, state corruption, or heavy virtual machine overhead.
+
+This guide provides a comprehensive walkthrough of lane concepts, configuration syntax, practical examples, and commands.
 
 ## Core Concepts
 
@@ -28,89 +30,192 @@ Each workspace receives a dedicated data directory located at .lane/data in nati
 
 lane does not run a continuous background daemon. Instead, it relies on file locks and a single machine-level registry file. Long operations hold individual workspace locks rather than a global machine lock. Process supervision is delegated to process-compose or the container runtime.
 
-## Workspace Management
+## Configuration Reference: lane.yaml
 
-### Creating Workspaces
+Every workspace reads its configuration from lane.yaml located at the root of the repository.
 
-Use the new command to create an isolated worktree and allocate required resources:
+### Top-Level Fields
 
-```sh
-lane new feature-login --up
+- version: Configuration format version. Currently set to 1.
+- base: Default baseline branch for new worktrees, such as main.
+- worktree_root: Optional directory path where new worktrees are created. Defaults to sibling directory named dot-lanes.
+- runtime: Runtime execution settings.
+  - backend: native or container. Defaults to native.
+  - engine: docker or podman when container backend is selected.
+  - image: Name of the prebuilt Linux container image.
+  - memory: Optional memory limit such as 2g.
+  - cpus: Optional CPU limit such as 2.
+  - user: Optional UID and GID override for container processes.
+- ports: List of named ports required by the project, such as web or pg.
+- listen: Mapping of named ports to internal TCP listen ports when using container mode.
+- env: Key-value map of environment variables injected into processes and hooks.
+- copy_dirs: List of repository directories copied into each new worktree using Copy on Write where available.
+- hooks: Lifecycle shell commands.
+  - setup: List of commands executed when a workspace is created or reset.
+  - teardown: List of commands executed before an owned workspace is removed.
+- processes: Mapping of background services managed by lane.
+  - command: Command string to execute.
+  - working_dir: Working directory for the process. Defaults to the workspace root.
+  - environment: Additional environment variables for this process.
+  - readiness_probe: Probe used to verify service availability during startup.
+    - http_get: HTTP readiness probe specifying host, port, and path.
+    - exec: Command readiness probe executing a shell command.
+    - initial_delay_seconds: Seconds to wait before first probe attempt.
+    - period_seconds: Interval between probe attempts.
+    - failure_threshold: Consecutive failures before marking the service unready.
+
+## Practical Configuration Examples
+
+### Example 1: Native Node.js Web Application
+
+```yaml
+version: 1
+base: main
+ports: [web]
+env:
+  PORT: ${LANE_PORT_WEB}
+processes:
+  web:
+    command: npm run dev -- --port "$LANE_PORT_WEB"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "${LANE_PORT_WEB}"
+        path: /
 ```
 
-The up flag immediately prepares the workspace, runs setup hooks, and starts all declared background processes.
+### Example 2: Native App with Managed PostgreSQL Service
 
-### Adopting Existing Worktrees
-
-If you already created a Git worktree outside lane, register it with the adopt command:
-
-```sh
-lane adopt
+```yaml
+version: 1
+base: main
+ports: [web, pg]
+env:
+  PORT: ${LANE_PORT_WEB}
+  DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app
+hooks:
+  setup:
+    - mkdir -p "$LANE_DATA_DIR/pg"
+    - test -d "$LANE_DATA_DIR/pg/base" || initdb -D "$LANE_DATA_DIR/pg" --no-locale --encoding=UTF8
+processes:
+  pg:
+    command: >
+      postgres -D "$LANE_DATA_DIR/pg" -p "$LANE_PORT_PG" -k "$LANE_DATA_DIR"
+      -c fsync=off -c synchronous_commit=off
+    readiness_probe:
+      exec:
+        command: pg_isready -h 127.0.0.1 -p "$LANE_PORT_PG"
+  web:
+    command: npm run dev -- --port "$LANE_PORT_WEB"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "${LANE_PORT_WEB}"
+        path: /
 ```
 
-lane assigns ports and metadata without taking destructive ownership. Adopted worktrees are never deleted automatically by cleanup commands.
+### Example 3: Container Mode with Fixed Listen Port
 
-### Running Commands
+When your application hardcodes listening on port 8080 and cannot read dynamic environment variables:
 
-The run command executes commands within the execution context of the workspace:
-
-```sh
-lane run -- npm test
+```yaml
+version: 1
+base: main
+runtime:
+  backend: container
+  engine: docker
+  image: lane-runtime:local
+ports: [web]
+listen:
+  web: 8080
+processes:
+  web:
+    command: python3 -m http.server 8080 --bind 127.0.0.1
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8080
+        path: /
 ```
 
-Environment variables for assigned ports, data directories, and workspace roots are injected automatically. Arguments are passed directly to the target executable without shell reinterpretation.
+### Example 4: Accelerating Data Initialization with Copy on Write
 
-### Resetting Workspaces
+For large databases, running full database migrations in every workspace can be slow. You can maintain a clean initialized template directory in your repository or host filesystem and clone it instantaneously:
 
-When test data becomes dirty or invalid, reset restores the private data directory and re-runs setup hooks:
-
-```sh
-lane reset feature-login
+```yaml
+version: 1
+base: main
+ports: [pg]
+hooks:
+  setup:
+    - |
+      if [ ! -d "$LANE_DATA_DIR/pg/base" ]; then
+        cp -a --reflink=auto .seed/pg "$LANE_DATA_DIR/pg" 2>/dev/null || \
+        (mkdir -p "$LANE_DATA_DIR/pg" && initdb -D "$LANE_DATA_DIR/pg" --no-locale --encoding=UTF8)
+      fi
 ```
 
-lane records the reset intent to disk before modifying files. If interrupted, the reset is resumed cleanly on the next command.
+On Linux with btrfs or xfs, and macOS with APFS, files clone in milliseconds without consuming initial disk space.
 
-### Stopping and Cleaning Up
+## Environment Variables Reference
 
-To stop running background processes while preserving workspace data:
+lane injects the following variables into every hook, service, and lane run command:
 
-```sh
-lane down feature-login
-```
+- LANE_WORKSPACE: Absolute path to the workspace directory.
+- LANE_ROOT: Path to the primary Git repository.
+- LANE_DATA_DIR: Private data storage path for this workspace.
+- LANE_SLUG: Workspace slug identifier.
+- LANE_BRANCH: Git branch name associated with this workspace.
+- LANE_PORT_NAME: Internal listening port for the named service.
+- LANE_HOST_PORT_NAME: Published host port on 127.0.0.1 for browser access.
 
-To tear down a completed workspace:
+In container mode, additional Git metadata variables are provided:
+- GIT_DIR: Internal linked worktree metadata path.
+- GIT_WORK_TREE: Mounted workspace root at slash-workspace.
+- HOME: Private container home directory.
+- XDG_CACHE_HOME: Private container cache path.
 
-```sh
-lane done feature-login
-```
+## Command Reference
 
-lane verifies that all local commits are either merged or pushed to upstream before removing files. Primary worktrees and external checkouts are protected from accidental removal.
-
-### Conservative Garbage Collection
-
-The gc command cleans up orphaned state entries and expired workspaces:
-
-```sh
-lane gc --dry-run
-lane gc
-```
-
-Garbage collection operates strictly with non-destructive rules. Workspaces containing unpushed commits or active commands are skipped.
+| Command | Purpose | Key Flags |
+| --- | --- | --- |
+| lane init | Create lane.yaml template and install agent skills | --force |
+| lane new slug | Create an isolated workspace and worktree | --up, --base branch |
+| lane adopt | Register an existing external Git worktree | --setup |
+| lane attach slug | Print workspace paths and shell export statements | --json |
+| lane ls | List all active workspaces and their status | --json |
+| lane status slug | Inspect process statuses and readiness probes | --json |
+| lane ports slug | View allocated ports and listen mappings | --json |
+| lane plan slug | Review the runtime contract before execution | --json |
+| lane up slug | Start all declared workspace background processes | |
+| lane down slug | Gracefully stop running processes without deleting data | |
+| lane logs proc slug | Stream stdout and stderr logs for a service | |
+| lane run -- cmd | Execute a command within the workspace environment | |
+| lane reset slug | Wipe private data directory and rerun setup hooks | |
+| lane done slug | Verify commit preservation and safely remove workspace | --force |
+| lane gc | Clean up orphaned registrations and inactive workspaces | --dry-run, --json |
+| lane doctor | Validate system dependencies and state health | --fix, --json |
+| lane open port slug | Open service publication URL in the host browser | --json |
+| lane skill install | Reinstall embedded SKILL.md into agent directories | |
+| lane hook install | Install worktree lifecycle hooks for Claude and Cursor | cursor, claude, all |
 
 ## Integration with Coding Agents
 
-lane includes embedded skills and hooks for modern coding tools including Claude Code and Cursor.
+lane is designed specifically for autonomous programming agents.
 
-Run init to install skill definitions into your repository:
+### Installing Skills and Hooks
 
-```sh
-lane init
-```
+Running lane init automatically deploys skill definitions to:
+- .agents/skills/lane/SKILL.md
+- .claude/skills/lane/SKILL.md
+- .cursor/skills/lane/SKILL.md
 
-Run hook install to link worktree lifecycle events with your editor:
+Running lane hook install all links worktree creation and teardown events directly to Claude Code and Cursor.
 
-```sh
-lane hook install all
-```
+### Guiding Your Agent
 
-Agents can query workspace status and port contracts in structured JSON format using flags such as --json.
+When working with an agent, you can ask it to perform tasks directly in isolated workspaces:
+
+> Create a new workspace named auth-refactor using lane, start the services, and implement the token renewal endpoint.
+
+The agent uses the embedded skill to interact with lane commands, verify service health, and run tests within the dedicated environment.
