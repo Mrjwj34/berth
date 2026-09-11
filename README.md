@@ -63,6 +63,16 @@ cd berth
 go build -o bin/berth ./cmd/berth
 ```
 
+### Install only the agent skill
+
+If you want the agent instructions without the binary, the `skills` CLI can install just the skill:
+
+```sh
+npx skills add Mrjwj34/berth
+```
+
+The skill checks for the binary first and tells your agent how to install it when it is missing.
+
 ## 30-Second Quick Start
 
 ### 1. Initialize berth in your repository
@@ -116,11 +126,30 @@ Docker and devcontainer provide complete operating system isolation. However, th
 
 berth chooses a pragmatic middle path. In native mode, it runs host processes directly with zero virtualization overhead while isolating ports, data directories, and environment variables. In container mode, it reuses a single Linux container per workspace without per-command rebuilds, forwarding host traffic through loopback gateways. berth treats the workspace rather than the entire operating system as the primary unit of isolation.
 
-## Agent integration
+## Supported agents
 
-berth is a plain CLI, so any agent that can run shell commands can drive it. `berth init` additionally installs one skill to `.agents/skills/berth/SKILL.md`, the single location read by Cursor, Codex, pi and Antigravity — there is exactly one copy to keep current, and berth writes nothing into `AGENTS.md`, `GEMINI.md` or any harness's own rules file.
+berth is a plain CLI, so any agent that can run shell commands can drive it. On top of that, `berth init` installs one skill into the shared `.agents/skills` convention, which these harnesses read directly:
 
-`berth hook install cursor` merges a Cursor worktree adapter into `.cursor/worktrees.json`, so `berth adopt --setup` runs inside every worktree Cursor creates in the Agents Window, the IDE or the CLI. Session-end hooks are deliberately not installed: stop work explicitly with `berth down` (keep data) or `berth done` (release the workspace), and let `berth gc` reclaim what was abandoned.
+> Codex · Cursor · GitHub Copilot · Gemini CLI · opencode · Windsurf · Kilo Code · Zed · JetBrains Junie · Google Antigravity · pi
+
+Claude Code and Cline read only their own skill directory, so berth can install a copy for them too. Skill installation is configurable by scope and by agent:
+
+```sh
+berth skill install                        # shared location, in this repository
+berth skill install --scope user           # shared location, in your home directory
+berth skill install --agent claude,cline   # plus the harnesses that need their own copy
+berth agents                               # what is supported, and what is installed
+```
+
+The skill can also be installed by the `skills` CLI, which needs no berth binary first:
+
+```sh
+npx skills add Mrjwj34/berth
+```
+
+Worktree hooks are optional and project-scoped: `berth hook install` wires the Cursor worktree adapter into `.cursor/worktrees.json`, and `berth hook install --agent windsurf` does the equivalent for Windsurf's `post_setup_worktree`, so `berth adopt --setup` runs inside every worktree those harnesses create. Existing entries are appended to, never replaced.
+
+Session-end hooks are deliberately not installed anywhere. Stop work explicitly with `berth down` (keep data) or `berth done` (release the workspace), and let `berth gc` reclaim what was abandoned.
 
 ## FAQ
 

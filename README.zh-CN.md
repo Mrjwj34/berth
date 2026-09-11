@@ -63,6 +63,16 @@ cd berth
 go build -o bin/berth ./cmd/berth
 ```
 
+### 只安装 Agent 技能
+
+如果你只想要 Agent 指令而不需要二进制，可以用 `skills` CLI 单独安装技能：
+
+```sh
+npx skills add Mrjwj34/berth
+```
+
+技能会先检查二进制是否存在，不存在时它会告知你的 Agent 如何安装。
+
 ## 30 秒快速开始
 
 ### 1. 初始化项目
@@ -116,11 +126,30 @@ Docker 与 devcontainer 提供完整的操作系统级虚拟化隔离。但它�
 
 berth 选择了更务实的中间路线。在原生模式下，它直接运行宿主机普通进程，零虚拟化损耗，同时自动分区端口、数据目录和环境变量。在容器模式下，它每个工作区复用单个 Linux 容器，无需每次重新构建镜像，也不拦截底层系统调用，通过回环网关转发流量。berth 将工作区而非整个虚拟机作为核心隔离单元。
 
-## Agent 集成
+## 支持的 Agent
 
-berth 就是一条普通 CLI，任何能执行 shell 命令的 Agent 都可以驱动它。此外 `berth init` 会把技能安装到唯一位置 `.agents/skills/berth/SKILL.md`，Cursor、Codex、pi 与 Antigravity 均读取该目录，因此只需维护一份副本；berth 不会向 `AGENTS.md`、`GEMINI.md` 或任何宿主工具自己的规则文件写入内容。
+berth 就是一条普通 CLI，任何能执行 shell 命令的 Agent 都可以驱动它。此外 `berth init` 会把技能安装到共享的 `.agents/skills` 约定位置，以下宿主会直接读取该目录：
 
-`berth hook install cursor` 会把 Cursor 工作树适配器合并进 `.cursor/worktrees.json`，使 Cursor 在 Agents Window、IDE 或 CLI 中创建的每个工作树都会自动执行 `berth adopt --setup`。会话结束钩子是有意不安装的：请显式用 `berth down`（保留数据）或 `berth done`（释放工作区）收尾，被遗忘的工作区交给 `berth gc` 回收。
+> Codex · Cursor · GitHub Copilot · Gemini CLI · opencode · Windsurf · Kilo Code · Zed · JetBrains Junie · Google Antigravity · pi
+
+Claude Code 与 Cline 只读取各自的技能目录，因此 berth 也可以为它们额外安装一份副本。技能安装支持指定作用域与指定 Agent：
+
+```sh
+berth skill install                        # 共享位置，装在当前仓库
+berth skill install --scope user           # 共享位置，装在用户主目录
+berth skill install --agent claude,cline   # 额外为需要独立目录的宿主安装
+berth agents                               # 查看支持列表与当前安装状态
+```
+
+也可以用 `skills` CLI 单独安装技能，无需先装 berth 二进制：
+
+```sh
+npx skills add Mrjwj34/berth
+```
+
+工作树钩子是可选的，且只作用于项目：`berth hook install` 会把 Cursor 的工作树适配器写入 `.cursor/worktrees.json`，`berth hook install --agent windsurf` 则写入 Windsurf 的 `post_setup_worktree`，使这些宿主创建的每个工作树都会执行 `berth adopt --setup`。已有的条目只会被追加，不会被替换。
+
+会话结束钩子有意不安装到任何宿主：请显式用 `berth down`（保留数据）或 `berth done`（释放工作区）收尾，被遗忘的工作区交给 `berth gc` 回收。
 
 ## 常见问题
 
