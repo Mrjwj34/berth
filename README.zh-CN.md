@@ -1,7 +1,5 @@
 <p>
-  <a href="https://github.com/Mrjwj34/lane">
-    <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" align="left" width="110" style="margin-right: 20px; margin-bottom: 12px;" />
-  </a>
+  <a href="https://github.com/Mrjwj34/lane"><img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" align="left" width="110" style="margin-right: 20px; margin-bottom: 12px;" /></a>
   <span style="font-size: 1.5em; font-weight: bold; line-height: 1.3;">快速、低成本地管理并行开发环境</span><br><br>
   <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
@@ -13,6 +11,10 @@
 <br clear="left" />
 
 lane 为多个 Agent 并行编程快速拉起轻量、隔离的本地工作区，将 Git worktree、私有数据目录、动态端口分配以及受管进程融为一体，无需承担虚拟机的庞大开销。
+
+<p align="center">
+  <img src="docs/demo.gif" alt="lane 演示动图" width="760" />
+</p>
 
 ## 安装
 

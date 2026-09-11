@@ -10,6 +10,8 @@ This guide provides a comprehensive walkthrough of lane concepts, configuration 
 
 A workspace in lane combines an isolated Git worktree, a private data directory, dynamically allocated ports, and a set of supervised background processes. Each workspace checked out from Git uses its own branch configuration. Changes made to configuration files in one workspace do not affect other workspaces.
 
+Workspaces are created beside the repository in `<repo>.lanes/<slug>` (or under `worktree_root`) on branch `lane/<slug>`, and a slug is lowercase ASCII with digits, `-` or `_` only. The primary checkout is never a workspace, and the commands that take no slug (`lane run`, `lane open`) resolve the workspace from the current directory, so run them from inside the path `lane new` printed.
+
 ### Dual Runtime Modes
 
 lane supports two distinct execution backends:
@@ -56,13 +58,23 @@ Every workspace reads its configuration from lane.yaml located at the root of th
 - processes: Mapping of background services managed by lane.
   - command: Command string to execute.
   - working_dir: Working directory for the process. Defaults to the workspace root.
-  - environment: Additional environment variables for this process.
+  - environment: Additional environment variables for this process, given as a list of KEY=VALUE strings, not as a mapping. lane prepends its identity variables and rejects LANE_* and GIT_* overrides.
   - readiness_probe: Probe used to verify service availability during startup.
     - http_get: HTTP readiness probe specifying host, port, and path.
     - exec: Command readiness probe executing a shell command.
     - initial_delay_seconds: Seconds to wait before first probe attempt.
     - period_seconds: Interval between probe attempts.
     - failure_threshold: Consecutive failures before marking the service unready.
+  - log_location: Optional per-process log file, as in the acceptance test. The processes mapping is passed through to process-compose v0.5, so its other documented fields such as depends_on and restart also work.
+
+### Worktree Include File
+
+A `.worktreeinclude` file at the repository root lists repository-relative paths,
+one per line, with `#` for comments. Each listed path is copied into a new
+worktree during setup (`lane new`, `lane reset`, `lane adopt --setup`), and
+entries that do not exist are skipped. It is a plain path list, not a
+`.gitignore` pattern file: use it for local gitignored files such as `.env`, and
+`copy_dirs` for whole dependency trees.
 
 ## Practical Configuration Examples
 
@@ -196,8 +208,8 @@ In container mode, additional Git metadata variables are provided:
 | lane gc | Clean up orphaned registrations and inactive workspaces | --dry-run, --json |
 | lane doctor | Validate system dependencies and state health | --fix, --json |
 | lane open port slug | Open service publication URL in the host browser | --json |
-| lane skill install | Reinstall embedded SKILL.md into agent directories | |
-| lane hook install | Install worktree lifecycle hooks for Claude and Cursor | cursor, claude, all |
+| lane skill install | Install the embedded SKILL.md into `.agents/skills/lane` | |
+| lane hook install | Install the `.agents/hooks` scripts and the harness adapter files | cursor, claude, scripts, all |
 
 ## Integration with Coding Agents
 
@@ -205,12 +217,35 @@ lane is designed specifically for autonomous programming agents.
 
 ### Installing Skills and Hooks
 
-Running lane init automatically deploys skill definitions to:
-- .agents/skills/lane/SKILL.md
-- .claude/skills/lane/SKILL.md
-- .cursor/skills/lane/SKILL.md
+lane keeps its agent assets in one directory per asset kind, so a repository does
+not grow a copy for every harness.
 
-Running lane hook install all links worktree creation and teardown events directly to Claude Code and Cursor.
+`lane init` and `lane skill install` deploy the skill to the single location
+`.agents/skills/lane/SKILL.md`. Harnesses that read `.agents/skills` (Cursor,
+DSH, Codex-style agents) discover it directly. Claude Code reads
+`.claude/skills/<name>/`, so give it one symlink rather than a second copy:
+
+```sh
+ln -s ../../.agents/skills/lane .claude/skills/lane
+```
+
+`lane hook install all` writes the shared hook scripts to `.agents/hooks/` and
+then the adapter file of each requested harness:
+
+- `.claude/settings.json` merges `WorktreeCreate` and `WorktreeRemove` handlers
+  that run the `.agents/hooks/claude-worktree-*.sh` scripts through `bash`, so
+  they do not depend on an executable bit surviving a checkout.
+- `.cursor/worktrees.json` merges `lane adopt --setup`, which registers Cursor's
+  own worktrees with lane.
+
+Use `lane hook install scripts` to write the shared scripts without any adapter.
+Hook behavior and limits: creation runs `lane new <name> --print-path`, which
+applies setup but does not start services; removal runs `lane down` only, leaving
+the registration for `lane gc` to reclaim. The Claude scripts need `bash`,
+`python3` and `lane` on `PATH` and are Unix-only, so on Windows install Git Bash
+or run `lane new` / `lane adopt --setup` directly. Adapter files belong to the
+harness configuration and are meant to be committed, so re-run
+`lane hook install` in a fresh clone instead of assuming the hooks are active.
 
 ### Guiding Your Agent
 
