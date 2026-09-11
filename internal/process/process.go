@@ -85,7 +85,11 @@ func Render(worktree string, processes map[string]any, env map[string]string) er
 func expandAny(v any, env map[string]string) any {
 	switch t := v.(type) {
 	case string:
-		return config.Expand(t, env)
+		s := config.Expand(t, env)
+		if n, err := strconv.Atoi(s); err == nil {
+			return n
+		}
+		return s
 	case map[string]any:
 		out := make(map[string]any, len(t))
 		for k, val := range t {
@@ -178,7 +182,8 @@ func Status(ctx context.Context, worktree string) ([]Proc, error) {
 	procs := make([]Proc, 0, len(raw))
 	for _, p := range raw {
 		ready := p.IsReady
-		healthy := strings.EqualFold(ready, "Ready") || strings.EqualFold(p.Status, "Running") && ready == ""
+		healthy := strings.EqualFold(ready, "Ready") || strings.EqualFold(ready, "N/A") ||
+			(strings.EqualFold(p.Status, "Running") && (ready == "" || strings.EqualFold(ready, "Unknown")))
 		procs = append(procs, Proc{
 			Name:    p.Name,
 			Status:  p.Status,
@@ -271,7 +276,7 @@ func waitReady(ctx context.Context, worktree string, timeout time.Duration) erro
 			continue
 		}
 		last = procs
-		if len(procs) == 0 || allHealthy(procs) {
+		if len(procs) == 0 || allReady(procs) {
 			return nil
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -279,14 +284,21 @@ func waitReady(ctx context.Context, worktree string, timeout time.Duration) erro
 	return fmt.Errorf("processes did not become ready within %s: %+v. Run lane logs <proc> or lane doctor", timeout, last)
 }
 
-func allHealthy(procs []Proc) bool {
+func allReady(procs []Proc) bool {
+	if len(procs) == 0 {
+		return false
+	}
 	for _, p := range procs {
 		if strings.EqualFold(p.Status, "Completed") || strings.EqualFold(p.Status, "Skipped") {
 			continue
 		}
-		if !p.Healthy && !strings.EqualFold(p.Status, "Running") {
+		if strings.EqualFold(p.Ready, "Not Ready") {
 			return false
 		}
+		if p.Healthy || strings.EqualFold(p.Status, "Running") {
+			continue
+		}
+		return false
 	}
 	return true
 }

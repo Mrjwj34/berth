@@ -42,7 +42,7 @@ func Run(ctx context.Context, st *state.Store, opts Options) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
-	rep := &Report{}
+	rep := &Report{Actions: []Action{}}
 
 	// 1. vanished directories
 	for key, ws := range file.Workspaces {

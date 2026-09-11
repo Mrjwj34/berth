@@ -84,7 +84,13 @@ func (a *App) New(ctx context.Context, slug, base string, up bool) (*WorkspaceVi
 	}
 	path := worktree.ResolvePath(repo, slug, cfg.WorktreeRoot)
 	branch := worktree.BranchName(slug)
-	if err := worktree.Add(ctx, repo, path, branch, base); err != nil {
+	if _, err := os.Stat(path); err == nil {
+		if listed, lerr := worktree.List(ctx, repo); lerr == nil && worktreeHas(listed, path) {
+			// leftover checkout from a previous attempt; reuse it
+		} else {
+			return nil, fmt.Errorf("worktree path %s already exists. Remove it (rm -rf %s) or run lane done %s --force", path, path, slug)
+		}
+	} else if err := worktree.Add(ctx, repo, path, branch, base); err != nil {
 		return nil, err
 	}
 	if err := worktree.ApplyInclude(ctx, repo, path); err != nil {
@@ -132,6 +138,16 @@ func (a *App) New(ctx context.Context, slug, base string, up bool) (*WorkspaceVi
 		}
 	}
 	return a.view(ctx, ws, true)
+}
+
+func worktreeHas(infos []worktree.Info, path string) bool {
+	want := mustKey(path)
+	for _, info := range infos {
+		if mustKey(info.Path) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) Adopt(ctx context.Context, setup bool) (*WorkspaceView, error) {
@@ -252,7 +268,7 @@ func (a *App) List(ctx context.Context) ([]WorkspaceView, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []WorkspaceView
+	out := []WorkspaceView{}
 	for _, ws := range file.Workspaces {
 		v, err := a.view(ctx, ws, false)
 		if err != nil {
