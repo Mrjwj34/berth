@@ -34,33 +34,106 @@ func (a *App) Init(ctx context.Context, force bool) error {
 	return skill.Install(repo)
 }
 
-func (a *App) SkillInstall(_ context.Context) error {
-	repo, err := gitx.MainRepo(context.Background(), cwd())
-	if err != nil {
-		return fmt.Errorf("not a git repository: %w", err)
-	}
-	return skill.Install(repo)
+// InstallResult reports one artifact an install command wrote, or found
+// already installed.
+type InstallResult struct {
+	Agent string
+	Scope string
+	// Path is relative to the scope root: the repository for project scope,
+	// the user profile for user scope.
+	Path    string
+	Changed bool
 }
 
-// HookInstall merges berth's adapter for the requested harness into that
-// harness's own configuration file. Cursor is the only supported harness that
-// documents a worktree-creation hook, so it is the only adapter berth installs
-// today; the selector stays so a future harness can be added without changing
-// the command line.
-func (a *App) HookInstall(ctx context.Context, which string) error {
+// SkillInstall writes the embedded skill into every selected harness
+// directory. A bare `berth skill install` keeps writing only the shared
+// .agents/skills/berth copy; --agent, --all and --scope widen that.
+func (a *App) SkillInstall(ctx context.Context, opts skill.Options) ([]InstallResult, error) {
+	opts, err := opts.Normalize()
+	if err != nil {
+		return nil, err
+	}
 	repo, err := gitx.MainRepo(ctx, cwd())
 	if err != nil {
-		return fmt.Errorf("not a git repository: %w", err)
+		if opts.Scope != skill.ScopeUser {
+			return nil, fmt.Errorf("not a git repository: %w", err)
+		}
+		// User scope writes into the profile only, so it works outside a
+		// repository; no project target is produced without one.
+		repo = ""
 	}
-	if which == "" {
-		which = "all"
+	home, err := skill.HomeDir()
+	if err != nil {
+		return nil, err
 	}
-	switch which {
-	case "cursor", "all":
-	default:
-		return fmt.Errorf("unknown harness %q. Use cursor or all", which)
+	targets, err := opts.SkillTargets(repo, home)
+	if err != nil {
+		return nil, err
 	}
-	return writeCursorHook(repo)
+	out := make([]InstallResult, 0, len(targets))
+	for _, target := range targets {
+		changed, err := skill.InstallInto(target.Dir)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, InstallResult{Agent: target.Harness.Name, Scope: target.Scope, Path: target.Rel(), Changed: changed})
+	}
+	return out, nil
+}
+
+// HookInstall merges berth's worktree adapter for the selected harnesses into
+// that harness's own configuration file. Hooks are project-scoped: a worktree
+// is created inside a repository, so there is no user-scope hook to write.
+func (a *App) HookInstall(ctx context.Context, opts skill.Options) ([]InstallResult, error) {
+	opts, err := opts.Normalize()
+	if err != nil {
+		return nil, err
+	}
+	if opts.Scope == skill.ScopeUser {
+		return nil, nil
+	}
+	repo, err := gitx.MainRepo(ctx, cwd())
+	if err != nil {
+		return nil, fmt.Errorf("not a git repository: %w", err)
+	}
+	hooks, err := opts.HookTargets()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]InstallResult, 0, len(hooks))
+	for _, h := range hooks {
+		var changed bool
+		switch h.Name {
+		case "cursor":
+			changed, err = writeCursorHook(repo)
+		case "windsurf":
+			changed, err = writeWindsurfHook(repo)
+		case "claude":
+			changed, err = writeClaudeHook(repo)
+		default:
+			err = fmt.Errorf("harness %q has no worktree hook berth installs", h.Name)
+		}
+		if err != nil {
+			return out, err
+		}
+		out = append(out, InstallResult{Agent: h.Name, Scope: skill.ScopeProject, Path: h.HookFile, Changed: changed})
+	}
+	return out, nil
+}
+
+// Agents reports which harnesses berth supports and what is already installed
+// in this repository and in the user profile. It only reads.
+func (a *App) Agents(ctx context.Context) (*skill.Report, error) {
+	repo, err := gitx.MainRepo(ctx, cwd())
+	if err != nil {
+		return nil, fmt.Errorf("not a git repository: %w", err)
+	}
+	home, err := skill.HomeDir()
+	if err != nil {
+		return nil, err
+	}
+	rep := skill.BuildReport(repo, home)
+	return &rep, nil
 }
 
 func (a *App) Doctor(ctx context.Context, fix bool) (*DoctorReport, error) {

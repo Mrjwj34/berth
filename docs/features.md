@@ -203,20 +203,43 @@ In container mode, additional Git metadata variables are provided:
 | berth gc | Clean up orphaned registrations and inactive workspaces | --dry-run, --json |
 | berth doctor | Validate system dependencies and state health | --fix, --json |
 | berth open port slug | Open service publication URL in the host browser | --json |
-| berth skill install | Install the embedded SKILL.md into `.agents/skills/berth` | |
-| berth hook install | Merge the Cursor worktree adapter into `.cursor/worktrees.json` | cursor, all |
+| berth agents | List supported harnesses and what is installed here | --json |
+| berth skill install | Install the embedded SKILL.md into the selected harness directories | --agent, --all, --scope |
+| berth hook install | Merge berth's worktree hook into the selected harness configuration | cursor, windsurf, claude, --agent, --all, --scope |
 
 ## Integration with Coding Agents
 
 berth is designed specifically for autonomous programming agents.
 
-### Installing Skills and Hooks
+### Installing the Skill
 
-berth keeps one skill and at most one adapter per harness, so a repository never grows a copy for every tool.
+berth keeps one copy of the skill per harness location and never writes a copy a harness does not read.
 
-`berth init` and `berth skill install` deploy the skill to the single location `.agents/skills/berth/SKILL.md`. Cursor, Codex, pi and Antigravity all discover skills in `.agents/skills`, so there is exactly one copy to keep up to date. berth writes nothing into `AGENTS.md`, `GEMINI.md` or any harness's own rules file.
+`berth init` and a bare `berth skill install` deploy the skill to the shared convention `<repo>/.agents/skills/berth/SKILL.md`, which twelve harnesses read directly: Codex, Cursor, GitHub Copilot, Gemini CLI, opencode, Windsurf/Devin Desktop, Roo Code, Kilo Code, Zed, JetBrains Junie, Google Antigravity and pi. For Zed that location is the only skills root; for Junie and pi project skills load only once the project is trusted.
 
-`berth hook install [cursor|all]` merges `.cursor/worktrees.json` with `berth adopt --setup`, which runs inside every worktree Cursor creates in the Agents Window, the IDE or the CLI. That is the only worktree-creation hook a supported harness documents: Codex creates detached worktrees under `$CODEX_HOME/worktrees`, Antigravity provisions a worktree per conversation, and pi has no worktree feature at all, so those harnesses are driven by the skill instead. Session-end hooks are deliberately not installed, because Codex caps its synchronous `SessionEnd` at a few seconds while `berth down` waits for processes to exit, and the other harnesses do not promise an event when a worktree or conversation goes away. Stop work explicitly with `berth down` (keep data) or `berth done` (release the workspace), and let `berth gc` reclaim what was abandoned — `gc.idle_stop_hours` makes it stop idle runtimes.
+Two harnesses do not read the shared convention, so they get their own copy when they are named explicitly:
+
+| Command | Writes |
+| --- | --- |
+| `berth skill install` | `<repo>/.agents/skills/berth/` |
+| `berth skill install --agent claude` | `<repo>/.claude/skills/berth/` |
+| `berth skill install --agent cline` | `<repo>/.cline/skills/berth/` |
+| `berth skill install --all` | every path above |
+| `berth skill install --scope user` | the same relative paths under the user's home directory, resolved with the platform's home directory and never inside the repository |
+
+`--agent` accepts a comma-separated list and may be repeated; an unknown name fails with the list of valid names. Project scope writes only inside the repository and user scope only inside the home directory. Every install is idempotent: a repeat run rewrites nothing and reports `already installed`. berth writes nothing into `AGENTS.md`, `GEMINI.md` or any harness's own rules file. `berth agents [--json]` reports which harness reads which path and whether each artifact is currently installed.
+
+### Installing Worktree Hooks
+
+berth installs exactly one kind of hook: the moment a harness creates a Git worktree, so that worktree registers itself with `berth adopt --setup`. It installs no session-end, interrupt or per-tool hooks: those run on a small time budget or on the critical path of every action, where a `berth down` that waits for supervised processes would be cancelled rather than completed.
+
+- `berth hook install` (or `berth hook install cursor`) merges `berth adopt --setup` into `.cursor/worktrees.json`, which Cursor runs inside every worktree it creates in the Agents Window, the IDE or the CLI. The three `setup-worktree*` arrays are appended to only when they hold no berth entry: every existing command and every unknown key in the file is preserved, and a file berth cannot parse is reported instead of overwritten.
+- `berth hook install windsurf` appends the same command to `post_setup_worktree` in `.windsurf/hooks.json`, creating the file when it is absent. Windsurf merges hook files across system, user and workspace scope, so this adds an entry rather than replacing one.
+- `berth hook install --agent claude` adds a `WorktreeCreate` hook to `.claude/settings.json` as a sibling of the events already configured there, preserving every other key. It is opt-in — `all` deliberately skips it — because Claude Code aborts worktree creation when a `WorktreeCreate` hook exits non-zero. The installed command therefore ends with `|| exit 0`: a failed adoption prints its diagnosis on stderr and leaves the checkout for `berth gc`, and it can never block Claude.
+
+Every hook file is written through a temporary file and a rename, because no harness documents a locking or partial-write contract for third-party hook installation. Running any install twice is a no-op.
+
+The remaining harnesses are driven by the skill alone. Codex, opencode, Kilo Code, pi, Gemini CLI and Antigravity document no repository-side worktree setup hook, and Junie, Cline and Antigravity create worktrees with no hook surface at all, so those worktrees are registered manually with `berth adopt --setup` or `berth new <slug>`. Stop work explicitly with `berth down` (keep data) or `berth done` (release the workspace), and let `berth gc` reclaim what was abandoned — `gc.idle_stop_hours` makes it stop idle runtimes.
 
 ### Guiding Your Agent
 

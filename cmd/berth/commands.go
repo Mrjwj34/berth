@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/Mrjwj34/berth/internal/app"
+	"github.com/Mrjwj34/berth/internal/skill"
 	"github.com/spf13/cobra"
 )
 
@@ -373,43 +375,132 @@ func cmdDoctor(asJSON *bool) *cobra.Command {
 
 func cmdSkill() *cobra.Command {
 	c := &cobra.Command{Use: "skill", Short: "Skill asset commands"}
-	c.AddCommand(&cobra.Command{
+	var agents []string
+	var all bool
+	var scope string
+	install := &cobra.Command{
 		Use:   "install",
-		Short: "Install the embedded SKILL.md into .agents/skills/berth",
+		Short: "Install the embedded skill into the selected harness directories",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts := skill.Options{Agents: agents, All: all, Scope: scope}
 			return withApp(func(ctx context.Context, a *app.App) error {
-				if err := a.SkillInstall(ctx); err != nil {
+				results, err := a.SkillInstall(ctx, opts)
+				if err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "installed skill into .agents/skills/berth")
+				printInstalls(cmd.OutOrStdout(), results)
 				return nil
 			})
 		},
-	})
+	}
+	install.Flags().StringArrayVar(&agents, "agent", nil, "harness to install for; repeatable or comma-separated. Default: the shared "+skill.SharedProjectPath)
+	install.Flags().BoolVar(&all, "all", false, "install for every supported harness")
+	install.Flags().StringVar(&scope, "scope", "project", "project (this repository) or user (your home directory)")
+	c.AddCommand(install)
 	return c
 }
 
 func cmdHook() *cobra.Command {
 	c := &cobra.Command{Use: "hook", Short: "Optional harness adapters"}
-	c.AddCommand(&cobra.Command{
-		Use:   "install [cursor|all]",
-		Short: "Merge the Cursor worktree adapter into .cursor/worktrees.json",
+	var agents []string
+	var all bool
+	var scope string
+	install := &cobra.Command{
+		Use:   "install [cursor|windsurf|claude|all]",
+		Short: "Merge berth's worktree adapter into the selected harness configuration",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			which := "all"
+			opts := skill.Options{Agents: agents, All: all, Scope: scope}
 			if len(args) == 1 {
-				which = args[0]
+				if args[0] == "all" {
+					opts.All = true
+				} else {
+					opts.Agents = append(opts.Agents, args[0])
+				}
+			}
+			normalized, err := opts.Normalize()
+			if err != nil {
+				return err
+			}
+			if normalized.Scope == skill.ScopeUser {
+				fmt.Fprintln(cmd.OutOrStdout(), "hooks are project-scoped: a worktree is created inside a repository, so berth has nothing to write at user scope. Nothing was written; re-run without --scope user")
+				return nil
 			}
 			return withApp(func(ctx context.Context, a *app.App) error {
-				if err := a.HookInstall(ctx, which); err != nil {
+				results, err := a.HookInstall(ctx, opts)
+				if err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "installed the Cursor worktree adapter into .cursor/worktrees.json")
+				printInstalls(cmd.OutOrStdout(), results)
 				return nil
 			})
 		},
-	})
+	}
+	install.Flags().StringArrayVar(&agents, "agent", nil, "harness worktree hook to install; repeatable or comma-separated. Default: every hook berth installs (cursor, windsurf)")
+	install.Flags().BoolVar(&all, "all", false, "install every hook berth installs (claude is opt-in and stays opt-in)")
+	install.Flags().StringVar(&scope, "scope", "project", "hooks are project-scoped; user is refused with a message")
+	c.AddCommand(install)
 	return c
+}
+
+// printInstalls prints one tab-separated line per artifact, in the order the
+// install visited them, so the output is deterministic and machine-readable.
+func printInstalls(w io.Writer, results []app.InstallResult) {
+	if len(results) == 0 {
+		fmt.Fprintln(w, "nothing to install")
+		return
+	}
+	for _, r := range results {
+		status := "already installed"
+		if r.Changed {
+			status = "installed"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Scope, r.Agent, r.Path, status)
+	}
+}
+
+func cmdAgents(asJSON *bool) *cobra.Command {
+	return &cobra.Command{
+		Use:   "agents",
+		Short: "List supported harnesses and what is installed in this repository",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withApp(func(ctx context.Context, a *app.App) error {
+				rep, err := a.Agents(ctx)
+				if err != nil {
+					return err
+				}
+				if *asJSON {
+					return writeJSON(cmd.OutOrStdout(), rep)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "repo\t%s\n", rep.Repo)
+				fmt.Fprintf(cmd.OutOrStdout(), "home\t%s\n", rep.Home)
+				fmt.Fprintln(cmd.OutOrStdout(), "NAME\tSHARED\tPROJECT\tUSER\tHOOK\tINSTALLED\tNOTE")
+				for _, row := range rep.Agents {
+					hook := "-"
+					if row.Hook != "" {
+						hook = row.Hook + " " + row.HookFile
+						if row.HookOptIn {
+							hook += " (opt-in)"
+						}
+					}
+					installed := fmt.Sprintf("project=%s user=%s", yesNo(row.InstalledProject), yesNo(row.InstalledUser))
+					if row.Hook != "" {
+						installed += " hook=" + yesNo(row.HookInstalled)
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+						row.Name, yesNo(row.ReadsShared), row.ProjectPath, row.UserPath, hook, installed, row.Note)
+				}
+				return nil
+			})
+		},
+	}
+}
+
+func yesNo(v bool) string {
+	if v {
+		return "yes"
+	}
+	return "no"
 }
 
 func cmdOpen(asJSON *bool) *cobra.Command {

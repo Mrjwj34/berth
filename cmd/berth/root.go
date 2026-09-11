@@ -55,6 +55,7 @@ func newRoot(info version.Info) *cobra.Command {
 		cmdDoctor(&asJSON),
 		cmdSkill(),
 		cmdHook(),
+		cmdAgents(&asJSON),
 		cmdOpen(&asJSON),
 		cmdVersion(info),
 		cmdPlan(),

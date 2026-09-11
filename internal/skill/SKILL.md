@@ -137,11 +137,42 @@ render fail.
 
 ## Harnesses
 
-This skill installs once, to `.agents/skills/berth/`, which Cursor, Codex, pi and
-Antigravity all read. A harness may hand you a Git worktree berth does not know
-about; give it a berth workspace rather than improvising — `berth adopt --setup`
-inside it when it is on a branch, `berth new <slug>` when it is detached or when
-the task needs its own ports and data.
+berth installs one skill. A bare `berth skill install` writes the shared
+`.agents/skills/berth/` copy, which twelve harnesses read: Codex, Cursor, GitHub
+Copilot, Gemini CLI, opencode, Windsurf/Devin Desktop, Roo Code, Kilo Code, Zed,
+JetBrains Junie, Google Antigravity and pi. Claude Code and Cline do not read that
+convention and need their own copy, so name them explicitly:
+
+| Command | Writes |
+| --- | --- |
+| `berth skill install` | `.agents/skills/berth/` |
+| `berth skill install --agent claude` | `.claude/skills/berth/` |
+| `berth skill install --agent cline` | `.cline/skills/berth/` |
+| `berth skill install --agent claude,cline` | both of the above |
+| `berth skill install --all` | every path above |
+| `berth skill install --scope user` | the same paths under the user's home directory |
+| `berth agents [--json]` | which harness reads which path, and what is installed here |
+
+Worktree adoption is a separate, opt-in step. berth installs only hooks that fire
+when a harness creates a worktree; it installs no session-end, interrupt or
+per-tool hook, because those sit on a budget or on the critical path and would
+cancel a `berth down` rather than complete it.
+
+| Command | Effect |
+| --- | --- |
+| `berth hook install` (or `cursor`) | appends `berth adopt --setup` to the `setup-worktree*` arrays in `.cursor/worktrees.json`, preserving every command already there |
+| `berth hook install windsurf` | appends the same command to `post_setup_worktree` in `.windsurf/hooks.json` |
+| `berth hook install --agent claude` | adds a `WorktreeCreate` hook to `.claude/settings.json`. Its command always exits 0 — a non-zero exit aborts Claude's worktree creation — so a failed adoption prints on stderr and its checkout is left to `berth gc` |
+
+Hooks are project-scoped; `berth hook install --scope user` says so and writes
+nothing. Every install is repeatable: running it twice leaves the files
+byte-identical and reports `already installed`.
+
+A harness may hand you a Git worktree berth does not know about; give it a berth
+workspace rather than improvising — `berth adopt --setup` inside it when it is on
+a branch, `berth new <slug>` when it is detached or when the task needs its own
+ports and data. Junie, Antigravity, Cline and Gemini CLI create worktrees with no
+repository-side setup hook, so those worktrees are always registered by hand.
 
 ## Cleanup and recovery
 
