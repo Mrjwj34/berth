@@ -1,0 +1,32 @@
+name: Bug
+description: Report something broken or unexpected in lane
+title: "fix: "
+labels: ["fix", "bug"]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What did lane actually do or output?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Minimal steps, command invocations, or lane.yaml configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS (macOS/Linux/Windows), Go version, git version.
+

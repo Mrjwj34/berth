@@ -1,0 +1,25 @@
+name: Feature
+description: Propose a new capability or enhancement for lane
+title: "feat: "
+labels: ["feat", "enhancement"]
+body:
+  - type: textarea
+    id: want
+    attributes:
+      label: Want
+      description: What capability or behavior should exist?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What problem, friction, or workflow does this unblock?
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What is explicitly NOT included in this proposal?
+

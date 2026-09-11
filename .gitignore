@@ -1,0 +1,22 @@
+# Binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts and coverage
+*.out
+*.test
+/coverage/
+
+# lane runtime and state
+/.lane/
+*.sock
+
+# IDE and OS
+.DS_Store
+.vscode/
+.idea/
+tmp/
