@@ -141,9 +141,8 @@ func (a *App) New(ctx context.Context, slug, base string, up bool) (*WorkspaceVi
 }
 
 func worktreeHas(infos []worktree.Info, path string) bool {
-	want := mustKey(path)
 	for _, info := range infos {
-		if mustKey(info.Path) == want {
+		if worktree.SamePath(info.Path, path) {
 			return true
 		}
 	}

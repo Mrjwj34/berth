@@ -32,7 +32,7 @@ func TestAddListRemove(t *testing.T) {
 	}
 	found := false
 	for _, info := range infos {
-		if info.Path == path {
+		if SamePath(info.Path, path) {
 			found = true
 			if info.Branch != "lane/feat-x" {
 				t.Fatalf("branch = %s", info.Branch)

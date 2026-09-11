@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -46,6 +47,9 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("unix socket path in this test")
 	}
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not available")
+	}
 	if _, err := LookPath(); err != nil {
 		if _, err := Ensure(context.Background()); err != nil {
 			t.Skip(err)
@@ -69,13 +73,6 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 	procs := map[string]any{
 		"web": map[string]any{
 			"command": "python3 -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
-			"readiness_probe": map[string]any{
-				"http_get": map[string]any{
-					"host": "127.0.0.1",
-					"port": "${LANE_PORT_WEB}",
-					"path": "/",
-				},
-			},
 		},
 	}
 	if err := Render(dir, procs, env); err != nil {

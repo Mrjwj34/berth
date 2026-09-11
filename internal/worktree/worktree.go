@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Mrjwj34/lane/internal/gitx"
@@ -19,6 +20,29 @@ type Info struct {
 	Path   string
 	Branch string
 	Bare   bool
+}
+
+func SamePath(a, b string) bool {
+	ca, err1 := canon(a)
+	cb, err2 := canon(b)
+	if err1 != nil || err2 != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(ca, cb)
+	}
+	return ca == cb
+}
+
+func canon(p string) (string, error) {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", err
+	}
+	if ev, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = ev
+	}
+	return filepath.Clean(abs), nil
 }
 
 func DefaultPath(repo, slug string) string {

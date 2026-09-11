@@ -153,6 +153,9 @@ func Key(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if ev, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = ev
+	}
 	return filepath.Clean(abs), nil
 }
 

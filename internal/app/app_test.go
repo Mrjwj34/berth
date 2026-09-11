@@ -15,10 +15,14 @@ func TestNewLSDoneLifecycle(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("LANE_HOME", home)
 	repo := initRepo(t)
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chdir(repo); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chdir("/") })
+	t.Cleanup(func() { _ = os.Chdir(orig) })
 
 	ctx := context.Background()
 	a, err := Open(ctx)
@@ -63,6 +67,9 @@ func TestNewLSDoneLifecycle(t *testing.T) {
 	}
 	if st.Slug != "feat-x" {
 		t.Fatalf("status slug = %s", st.Slug)
+	}
+	if err := os.Chdir(repo); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := a.Done(ctx, "feat-x", true); err != nil {
