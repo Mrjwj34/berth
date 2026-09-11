@@ -6,7 +6,8 @@
   <a href="https://github.com/Mrjwj34/berth/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/berth/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/Mrjwj34/berth/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/berth" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/berth" alt="Go Version" /></a>
-  <a href="https://img.shields.io/github/license/Mrjwj34/berth" title="MIT"><img src="https://img.shields.io/github/license/Mrjwj34/berth" alt="开源许可" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/berth" alt="开源许可" /></a>
+  <a href="https://mrjwj34.github.io/berth/"><img src="https://img.shields.io/badge/docs-website-blue" alt="文档站" /></a>
 </p>
 <br clear="left" />
 
@@ -23,6 +24,19 @@ berth 为多个 Agent 并行编程快速拉起轻量、隔离的本地工作区�
 ## 安装
 
 你可以通过以下任意一种方式安装 berth。
+
+### Homebrew（macOS 与 Linux）
+
+```sh
+brew install Mrjwj34/tap/berth
+```
+
+### Scoop（Windows）
+
+```powershell
+scoop bucket add berth https://github.com/Mrjwj34/scoop-bucket
+scoop install berth
+```
 
 ### 下载预编译二进制
 
@@ -157,6 +171,7 @@ berth 将工作区生命周期管理与底层执行环境解耦。每个工作�
 </div>
 
 详细文档导航：
+- 文档站：[mrjwj34.github.io/berth](https://mrjwj34.github.io/berth/) 是渲染后的完整指南，包含三篇对比页
 - 用户指南：[docs/features.md](docs/features.md) 介绍完整配置参考、实用工作流以及 Agent 工具集成
 - 运行时契约：[docs/runtime.md](docs/runtime.md) 详细说明网络模式、端口映射、容器运行方式与生命周期规则
 - 架构设计记录：[docs/architecture.md](docs/architecture.md) 详细介绍无守护进程锁设计、状态恢复机制与安全不变式

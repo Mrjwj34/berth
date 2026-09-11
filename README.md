@@ -7,6 +7,7 @@
   <a href="https://github.com/Mrjwj34/berth/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/berth" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/berth" alt="Go Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/berth" alt="License" /></a>
+  <a href="https://mrjwj34.github.io/berth/"><img src="https://img.shields.io/badge/docs-website-blue" alt="Documentation" /></a>
 </p>
 <br clear="left" />
 
@@ -23,6 +24,19 @@ berth provisions lightweight, isolated local workspaces for parallel agent progr
 ## Install
 
 Choose any of the following installation methods.
+
+### Homebrew (macOS and Linux)
+
+```sh
+brew install Mrjwj34/tap/berth
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add berth https://github.com/Mrjwj34/scoop-bucket
+scoop install berth
+```
 
 ### Download prebuilt binaries
 
@@ -157,6 +171,7 @@ berth separates workspace management from the execution context. Each workspace 
 </div>
 
 Detailed documentation:
+- Website: [mrjwj34.github.io/berth](https://mrjwj34.github.io/berth/) is the rendered guide, including the comparison pages.
 - User Guide: [docs/features.md](docs/features.md) covers complete configuration references, practical workflows, and agent integrations.
 - Runtime contract: [docs/runtime.md](docs/runtime.md) explains networking, port mapping, and container execution rules.
 - Architecture decisions: [docs/architecture.md](docs/architecture.md) details the daemonless lock model, state recovery, and safety invariants.
