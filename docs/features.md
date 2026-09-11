@@ -10,6 +10,8 @@ This guide provides a comprehensive walkthrough of lane concepts, configuration 
 
 A workspace in lane combines an isolated Git worktree, a private data directory, dynamically allocated ports, and a set of supervised background processes. Each workspace checked out from Git uses its own branch configuration. Changes made to configuration files in one workspace do not affect other workspaces.
 
+Workspaces are created beside the repository in `<repo>.lanes/<slug>` (or under `worktree_root`) on branch `lane/<slug>`, and a slug is lowercase ASCII with digits, `-` or `_` only. The primary checkout is never a workspace, and the commands that take no slug (`lane run`, `lane open`) resolve the workspace from the current directory, so run them from inside the path `lane new` printed.
+
 ### Dual Runtime Modes
 
 lane supports two distinct execution backends:
@@ -56,13 +58,18 @@ Every workspace reads its configuration from lane.yaml located at the root of th
 - processes: Mapping of background services managed by lane.
   - command: Command string to execute.
   - working_dir: Working directory for the process. Defaults to the workspace root.
-  - environment: Additional environment variables for this process.
+  - environment: Additional environment variables for this process, given as a list of KEY=VALUE strings, not as a mapping. lane prepends its identity variables and rejects LANE_* and GIT_* overrides.
   - readiness_probe: Probe used to verify service availability during startup.
     - http_get: HTTP readiness probe specifying host, port, and path.
     - exec: Command readiness probe executing a shell command.
     - initial_delay_seconds: Seconds to wait before first probe attempt.
     - period_seconds: Interval between probe attempts.
     - failure_threshold: Consecutive failures before marking the service unready.
+  - log_location: Optional per-process log file, as used by the acceptance test. The processes mapping is passed through to process-compose v0.5, so its other documented fields such as depends_on and restart also work.
+
+### Worktree Include File
+
+A `.worktreeinclude` file at the repository root lists repository-relative paths, one per line, with `#` for comments. Each listed path is copied into a new worktree during setup (`lane new`, `lane reset`, `lane adopt --setup`), and entries that do not exist are skipped. It is a plain path list, not a `.gitignore` pattern file: use it for local gitignored files such as `.env`, and `copy_dirs` for whole dependency trees.
 
 ## Practical Configuration Examples
 
@@ -196,8 +203,8 @@ In container mode, additional Git metadata variables are provided:
 | lane gc | Clean up orphaned registrations and inactive workspaces | --dry-run, --json |
 | lane doctor | Validate system dependencies and state health | --fix, --json |
 | lane open port slug | Open service publication URL in the host browser | --json |
-| lane skill install | Reinstall embedded SKILL.md into agent directories | |
-| lane hook install | Install worktree lifecycle hooks for Claude and Cursor | cursor, claude, all |
+| lane skill install | Install the embedded SKILL.md into `.agents/skills/lane` | |
+| lane hook install | Merge the Cursor worktree adapter into `.cursor/worktrees.json` | cursor, all |
 
 ## Integration with Coding Agents
 
@@ -205,12 +212,11 @@ lane is designed specifically for autonomous programming agents.
 
 ### Installing Skills and Hooks
 
-Running lane init automatically deploys skill definitions to:
-- .agents/skills/lane/SKILL.md
-- .claude/skills/lane/SKILL.md
-- .cursor/skills/lane/SKILL.md
+lane keeps one skill and at most one adapter per harness, so a repository never grows a copy for every tool.
 
-Running lane hook install all links worktree creation and teardown events directly to Claude Code and Cursor.
+`lane init` and `lane skill install` deploy the skill to the single location `.agents/skills/lane/SKILL.md`. Cursor, Codex, pi and Antigravity all discover skills in `.agents/skills`, so there is exactly one copy to keep up to date. lane writes nothing into `AGENTS.md`, `GEMINI.md` or any harness's own rules file.
+
+`lane hook install [cursor|all]` merges `.cursor/worktrees.json` with `lane adopt --setup`, which runs inside every worktree Cursor creates in the Agents Window, the IDE or the CLI. That is the only worktree-creation hook a supported harness documents: Codex creates detached worktrees under `$CODEX_HOME/worktrees`, Antigravity provisions a worktree per conversation, and pi has no worktree feature at all, so those harnesses are driven by the skill instead. Session-end hooks are deliberately not installed, because Codex caps its synchronous `SessionEnd` at a few seconds while `lane down` waits for processes to exit, and the other harnesses do not promise an event when a worktree or conversation goes away. Stop work explicitly with `lane down` (keep data) or `lane done` (release the workspace), and let `lane gc` reclaim what was abandoned — `gc.idle_stop_hours` makes it stop idle runtimes.
 
 ### Guiding Your Agent
 

@@ -3,41 +3,28 @@ package skill
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
-func TestInstallWritesSkillCopies(t *testing.T) {
+func TestInstallWritesSkillUnderAgents(t *testing.T) {
 	root := t.TempDir()
 	if err := Install(root); err != nil {
 		t.Fatal(err)
 	}
-	for _, rel := range []string{
-		".agents/skills/lane/SKILL.md",
-		".claude/skills/lane/SKILL.md",
-		".cursor/skills/lane/SKILL.md",
-	} {
-		data, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(data) < 100 {
-			t.Fatalf("%s too small", rel)
-		}
-	}
-}
-
-func TestWriteHooks(t *testing.T) {
-	root := t.TempDir()
-	if err := WriteHooks(root); err != nil {
-		t.Fatal(err)
-	}
-	p := filepath.Join(root, ".lane", "hooks", "claude-worktree-create.sh")
-	st, err := os.Stat(p)
+	data, err := os.ReadFile(SkillPath(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if runtime.GOOS != "windows" && st.Mode()&0o111 == 0 {
-		t.Fatalf("hook is not executable: %s", st.Mode())
+	if len(data) < 100 {
+		t.Fatalf("%s too small", SkillPath(root))
+	}
+	for _, stale := range []string{
+		".claude/skills/lane/SKILL.md",
+		".cursor/skills/lane/SKILL.md",
+		".lane/hooks",
+	} {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(stale))); !os.IsNotExist(err) {
+			t.Fatalf("lane must not install outside .agents: %s", stale)
+		}
 	}
 }

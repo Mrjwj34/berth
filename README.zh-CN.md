@@ -55,7 +55,7 @@ lane init
 lane hook install all
 ```
 
-该操作会生成基础模板，自动将技能定义分发至 Claude Code 与 Cursor 目录，并配置工作区生命周期钩子。
+该操作会生成基础模板，把 Agent 技能安装到 `.agents/skills/lane`（Cursor、Codex、pi、Antigravity 均读取该目录），并把 Cursor 工作树适配器合并进 `.cursor/worktrees.json`。
 
 ### 2. 让 Agent 自动配置 lane.yaml
 

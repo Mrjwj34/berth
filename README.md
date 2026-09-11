@@ -55,7 +55,7 @@ lane init
 lane hook install all
 ```
 
-This generates a base template, installs the skill definition into agent directories for tools like Claude Code and Cursor, and configures worktree hooks.
+This generates a base template, installs the agent skill to `.agents/skills/lane` for Cursor, Codex, pi and Antigravity, and merges the Cursor worktree adapter into `.cursor/worktrees.json`.
 
 ### 2. Let your Agent configure lane.yaml
 

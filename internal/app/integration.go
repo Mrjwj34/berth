@@ -42,6 +42,11 @@ func (a *App) SkillInstall(_ context.Context) error {
 	return skill.Install(repo)
 }
 
+// HookInstall merges lane's adapter for the requested harness into that
+// harness's own configuration file. Cursor is the only supported harness that
+// documents a worktree-creation hook, so it is the only adapter lane installs
+// today; the selector stays so a future harness can be added without changing
+// the command line.
 func (a *App) HookInstall(ctx context.Context, which string) error {
 	repo, err := gitx.MainRepo(ctx, cwd())
 	if err != nil {
@@ -50,27 +55,12 @@ func (a *App) HookInstall(ctx context.Context, which string) error {
 	if which == "" {
 		which = "all"
 	}
-	if err := skill.WriteHooks(repo); err != nil {
-		return err
-	}
 	switch which {
 	case "cursor", "all":
-		if err := writeCursorHook(repo); err != nil {
-			return err
-		}
-	}
-	switch which {
-	case "claude", "all":
-		if err := writeClaudeHook(repo); err != nil {
-			return err
-		}
-	case "cursor":
 	default:
-		if which != "all" {
-			return fmt.Errorf("unknown harness %q. Use cursor, claude, or all", which)
-		}
+		return fmt.Errorf("unknown harness %q. Use cursor or all", which)
 	}
-	return nil
+	return writeCursorHook(repo)
 }
 
 func (a *App) Doctor(ctx context.Context, fix bool) (*DoctorReport, error) {
