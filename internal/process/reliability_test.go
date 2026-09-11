@@ -99,7 +99,7 @@ func TestReadinessMatchesSupervisorProbeState(t *testing.T) {
 }
 func TestRenderPreservesNumericStrings(t *testing.T) {
 	dir := t.TempDir()
-	if err := Render(dir, map[string]any{"x": map[string]any{"command": "1234", "environment": []any{"VALUE=0001"}}}, nil); err != nil {
+	if err := RenderAt(dir, dir, map[string]any{"x": map[string]any{"command": "1234", "environment": []any{"VALUE=0001"}}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(PCFile(dir))

@@ -4,155 +4,232 @@
 
 一个工作区包括 Git worktree、独立的数据目录、端口分配，以及一组项目声明的进程。lane 不理解某一种数据库，也不绑定某一种 Agent harness。
 
-## 两种明确的运行方式
+---
 
-| 模式 | 适用场景 | 边界 |
-| --- | --- | --- |
-| `native`（默认） | 项目已经支持参数、配置文件或环境变量指定端口和数据路径 | 运行宿主原生进程；资源分区，不提供透明网络隔离 |
-| `container` | 多个工作区需要保留相同的硬编码监听端口 | 每工作区一个可复用 Linux 容器；服务、测试、迁移和 hooks 进入同一容器 |
+## 核心特性
 
-容器模式复用本机已有的 Docker/Podman Linux 引擎与预构建镜像。macOS/Windows 可以使用引擎管理的共享 Linux VM，**不是每个工作区再创建一个 VM，也不是每次运行都重新构建镜像**。引擎和镜像缺失会报错，不会静默退回宿主执行。
+- **去中心化无守护进程（Daemonless）**：不驻留后台守护进程，依赖局部文件锁与状态持久化保证跨进程原子性。
+- **两种明确的执行后端**：
+  - **Native（默认）**：直接运行宿主原生进程，极低资源开销；通过环境变量与动态端口分配隔离不同工作区。
+  - **Container**：复用本机已有的 Docker/Podman Linux 容器；内部通过 Loopback 端口转发支持硬编码监听端口（如 8080/5432），消除端口冲突。
+- **严格的数据安全防误删（Anti-footgun）**：
+  - 严禁删除或接管 Git 主工作树（Primary Checkout）；
+  - 严禁删除含有未推送提交或脏代码的工作区（即便指定 `--force` 也会受到多重身份与状态阻断）；
+  - 外部接管的 `adopt` 工作区在 `done` 时仅注销运行态，永远保留代码与分支；
+  - 自动 GC 永远以保守策略运行，绝不静默强制删除。
+- **开箱即用的 Agent 支持**：
+  - 内置 `SKILL.md`，支持一键安装至 Claude Code、Cursor 和各类 Coding Agent；
+  - 提供 Cursor Worktree 和 Claude Code 的生命周期集成 Hook。
 
-这些环境用于协作开发，不是运行恶意代码的安全沙箱。容器可写工作树与共享 Git 元数据；共享凭据、绝对路径、宿主工具和平台专用程序不会自动虚拟化。详见 [运行契约](docs/runtime.md)。
+---
 
-## 安装与原生模式
+## 安装
+
+### 方式 1: GitHub Releases 二进制下载（推荐，免 Go 环境）
+
+直接从 [GitHub Releases](https://github.com/Mrjwj34/lane/releases) 下载对应操作系统的预编译二进制归档，解压后将 `lane` 放置在系统 `PATH` 路径即可：
+- **Linux** (`x86_64` / `arm64`): `lane_<version>_linux_<arch>.tar.gz`
+- **macOS** (`Intel` / `Apple Silicon`): `lane_<version>_darwin_<arch>.tar.gz`
+- **Windows** (`x86_64` / `arm64`): `lane_<version>_windows_<arch>.zip`
+
+### 方式 2: Go Install（需 Go 1.25+）
 
 ```sh
 go install github.com/Mrjwj34/lane/cmd/lane@latest
-# 在项目中：
-lane init
 ```
 
-编辑并提交项目的 `lane.yaml`。新工作区从指定 Git 基线检出，并使用**自己的**配置，不读取主工作树里未提交的运行配置。
+安装完成后可通过 `lane version` 验证安装成功及版本信息。
+
+### 方式 3: 从源码构建
+
+```sh
+git clone https://github.com/Mrjwj34/lane.git
+cd lane
+go build -o bin/lane ./cmd/lane
+# 将 ./bin 添加到 PATH 或复制到系统目录
+```
+
+---
+
+## 快速上手与 Agent 工作流
+
+### 1. 项目接入与 Agent Skill 安装
+
+在项目根目录下执行：
+
+```sh
+# 生成默认 lane.yaml 模板并自动将 SKILL.md 分发至各 Agent 目录
+lane init
+
+# 如需为 Cursor 或 Claude Code 安装 worktree 联动 hook：
+lane hook install all
+```
+
+执行后将自动安装：
+- `.agents/skills/lane/SKILL.md`
+- `.claude/skills/lane/SKILL.md`
+- `.cursor/skills/lane/SKILL.md`
+
+### 2. 编写 `lane.yaml`
+
+编辑并提交项目根目录下的 `lane.yaml`。每个新工作区在检出时使用其**分支自身**的配置，不读取主工作树中未提交的草稿。
+
+#### 原生模式示例（支持动态端口配置的项目）
 
 ```yaml
 version: 1
 base: main
-runtime:
-  backend: native
-ports: [web]
+ports: [web, pg]
 env:
   PORT: ${LANE_PORT_WEB}
+  DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app
+hooks:
+  setup:
+    - mkdir -p "$LANE_DATA_DIR/pg"
+    - test -d "$LANE_DATA_DIR/pg/base" || initdb -D "$LANE_DATA_DIR/pg" --no-locale --encoding=UTF8
 processes:
+  pg:
+    command: postgres -D "$LANE_DATA_DIR/pg" -p "$LANE_PORT_PG" -k "$LANE_DATA_DIR"
+    readiness_probe:
+      exec:
+        command: pg_isready -h 127.0.0.1 -p "$LANE_PORT_PG"
   web:
     command: npm run dev -- --port "$LANE_PORT_WEB"
+    readiness_probe:
+      http_get: {host: 127.0.0.1, port: "${LANE_PORT_WEB}", path: /}
 ```
 
-```sh
-lane new feature-a --up
-lane new feature-b --up
-lane ls --json
-lane plan feature-a
-```
+#### 容器模式示例（硬编码监听端口，如固定 8080）
 
-没有 `lane.yaml` 时，`new/ls/attach/done` 仍可用于纯 Git worktree 生命周期，无需容器或进程编排器。
-
-## 不改硬编码端口的隔离模式
-
-先在 **lane 源码目录** 构建一次基础镜像。它包含 bash、Git、Python、socat 和固定版本的 process-compose：
+容器模式复用本地 Docker/Podman 引擎与预构建镜像，每个工作区启动一个轻量 Linux 容器实例。
+先在 **lane 源码目录** 或项目自身构建一次镜像：
 
 ```sh
 docker build -t lane-runtime:local -f runtime/Dockerfile .
-# Go 项目可以使用包含 Go 工具链的基础镜像：
-docker build --build-arg BASE_IMAGE=golang:1.25-bookworm \
-  -t lane-go:local -f runtime/Dockerfile .
 ```
 
-也可以为项目制作自己的镜像。使用稳定镜像引用或 digest；依赖与工具链在镜像构建时准备，不在每个 workspace 启动时重新安装。
-
-项目配置：
+在项目中配置：
 
 ```yaml
 version: 1
 base: main
 runtime:
   backend: container
-  engine: docker                  # 也接受 podman；必须是可访问工作树的本地 Linux 引擎
-  image: lane-runtime:local        # 必须已存在；lane 不自动 pull/build
-  memory: 2g                      # 可选上限，不是每工作区预留内存
-  cpus: 2
+  engine: docker                   # 或 podman
+  image: lane-runtime:local         # 镜像必须已存在，lane 绝不隐式 pull/build
 ports: [web]
 listen:
-  web: 8080                       # 应用原来的 TCP 监听端口，30000 等也可以
-hooks:
-  setup: []                       # 在容器中运行，失败后会重试，必须可重复执行
-  teardown: []
+  web: 8080                        # 应用原始硬编码监听端口
 processes:
   web:
     command: python3 -m http.server 8080 --bind 127.0.0.1
     readiness_probe:
-      http_get:
-        host: 127.0.0.1
-        port: 8080
-        path: /
+      http_get: {host: 127.0.0.1, port: 8080, path: /}
 ```
 
-两个工作区都可以保留内部 `127.0.0.1:8080`。宿主访问各自独立的发布端口；内部回环转发支持只绑定 loopback 的应用，不拦截 `bind/connect` 系统调用。
+### 3. 创建与并行开发
 
 ```sh
+# 在全新独立工作区检出分支并启动进程
 lane new feature-a --up
+
+# 并行创建第二个工作区（端口自动隔离，互不冲突）
 lane new feature-b --up
-lane open web                     # 在对应工作区目录运行
-lane run -- python3 -c 'import urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8080").status)'
+
+# 查看所有工作区状态（支持 --json 给 Agent 消费）
+lane ls --json
+lane status feature-a
 ```
 
-`lane run` 的命令在当前工作区的同一执行环境中运行。`argv` 不被二次解析；需要 shell 时显式使用 `lane run -- sh -c '...'`。容器命令取消时停止该工作区容器，确保不会只终止 `docker exec` 客户端而留下目标命令。
+### 4. 工作区环境内执行命令
 
-## 环境变量
-
-`LANE_WORKSPACE`、`LANE_ROOT`、`LANE_DATA_DIR` 和 `LANE_PORT_<NAME>` 对应**当前执行环境**。容器内的数据目录为 `/workspace/.lane/data`，`LANE_PORT_WEB` 为原始监听端口；原生模式对应宿主路径和分配端口。
-
-`LANE_HOST_PORT_<NAME>` 始终是宿主发布端口，适合浏览器 URL 或前端构建参数。`attach` 输出宿主可用的环境变量；`ports --json`、`status --json`、`plan` 显示资源契约。发布端口当前仅支持 IPv4 回环上的 TCP；UDP/IPv6 不作为宿主发布契约。内部网络命名空间不受这个发布协议限制。
-
-## 生命周期与安全
-
-`new` 的初始化进度写入注册表。setup 失败后保留工作树，重试同名 `new` 或 `up` 会重试未完成的 setup。`down` 停止进程/容器但保留数据；容器下次启动复用同一实例。`reset` 确认运行环境停止后才重建数据与执行 setup。
-
-`reset` 在操作前记录待重置状态；中断后，下一次 `new/up/run` 会先完成数据重置与 setup。`done` 删除工作树后若分支删除或登记清理失败，可以重试同一命令；期间发生变化的分支不会被误删，GC 会保留恢复记录并提示显式重试。
-
-`done` 删除 lane 创建的工作树前，必须确认工作树干净，且提交已在基线或 upstream 中保存。`--force` 仅跳过内容保留检查，**不能跳过主工作树保护、身份检查或进程停止检查**。
-
-`adopt` 接管外部工具创建的 linked worktree。之后 `done` 只停止并注销运行环境，保留其工作树、数据和分支，即使指定 `--force`。主工作树不允许 adopt。旧版注册记录不会被自动授予删除权限；可在对应目录显式 `adopt` 完成安全迁移。
-
-跨进程端口分配与登记在一个事务中完成。长操作使用工作区级锁，不持有全局注册表锁。注册表租约不是操作系统 socket 保留；外部进程抢占端口时启动失败，不伪装成功。
-
-依赖复制使用 macOS clonefile / Linux reflink，不支持时普通复制，**不会以硬链接共享可写依赖**。外部符号链接不作为独立复制的保证范围。
-
-## 清理与诊断
-
-GC 只在显式调用时执行，默认策略关闭：
-
-```yaml
-gc:
-  idle_stop_hours: 0
-  remove_after_days: 0
-  max_workspaces: 0
-```
+`lane run` 将命令直接运行在对应工作区的同一执行上下文中（注入对应环境变量）：
 
 ```sh
-lane gc --dry-run --json
-lane gc
-lane doctor --json
-lane doctor --fix                 # 仅准备原生依赖，不执行破坏性 GC
+cd /path/to/feature-a
+# 运行迁移或测试（argv 严格保持，不被二次转义）
+lane run -- pytest
+# 浏览器打开已映射的发布端口
+lane open web
+# 查看某进程实时日志
+lane logs web
 ```
 
-GC 跳过正在执行命令的工作区，重新检查身份和提交保留条件，永不使用强制删除。空闲时间基于 lane 操作，不是 CPU 使用率、浏览器流量或编辑器活动；启用空闲停机前应理解这个边界。状态不确定时保留数据并给出 warning，而不是猜测“已经停止”。
+### 5. 重置、停止与清理
 
-## 命令
+```sh
+# 清空当前工作区的私有数据目录并重新执行 setup hook
+lane reset
 
-`init`、`skill install`、`hook install`、`new`、`adopt`、`attach`、`ls`、`status`、`ports`、`plan`、`up`、`down`、`run`、`logs`、`reset`、`done`、`gc`、`doctor`、`open`。
+# 停止工作区进程（保留数据与容器实例，下次 up 快速恢复）
+lane down
+
+# 开发完成，提交或合并后安全销毁（严格检查干净度与已保存状态）
+lane done
+
+# 定期保守清理废弃工作区（跳过运行中和有未保存提交的工作区）
+lane gc --dry-run
+lane gc
+```
+
+---
+
+## 环境变量与端口契约
+
+| 变量名 | 含义与范围 |
+| :--- | :--- |
+| `LANE_WORKSPACE` | 当前工作区绝对路径（容器内为 `/workspace`） |
+| `LANE_ROOT` | 关联的主仓库根路径 |
+| `LANE_DATA_DIR` | 工作区专属数据目录（原生下为 `.lane/data`，容器内为 `/workspace/.lane/data`） |
+| `LANE_PORT_<NAME>` | **当前执行环境内**的服务监听端口（容器模式下对应内部监听端口） |
+| `LANE_HOST_PORT_<NAME>`| **宿主机发布端口**（供宿主浏览器访问或外部调用使用） |
+
+> [!NOTE]
+> 发布端口契约支持 IPv4 Loopback (127.0.0.1) 上的 TCP 流量。详细网络和生命周期规范请参阅 [运行契约 (docs/runtime.md)](docs/runtime.md)。
+
+---
+
+## 常用命令速查
+
+| 命令 | 说明 | 常用参数 |
+| :--- | :--- | :--- |
+| `lane init` | 初始化生成 `lane.yaml` 并安装 Agent skill | `--force` |
+| `lane new <slug>` | 从 baseline 创建独立 Git worktree 工作区 | `--up`, `--base <branch>` |
+| `lane adopt` | 将已存在的外部 Git worktree 纳入 lane 管理 | `--setup` |
+| `lane attach` | 输出当前工作区的环境变量导出语句 | `--json` |
+| `lane ls` | 列出所有工作区及其运行状态 | `--json` |
+| `lane status` | 查看指定工作区的进程与探针状态 | `--json` |
+| `lane ports` | 查看已分配的主机发布端口与监听端口 | `--json` |
+| `lane plan` | 审查工作区运行契约与端口分配计划 | |
+| `lane up` | 启动当前工作区声明的所有服务进程 | |
+| `lane down` | 优雅停止当前工作区服务（保留数据） | |
+| `lane logs <proc>` | 查看指定托管进程的标准输出与错误日志 | |
+| `lane run -- <cmd>` | 在工作区执行上下文中运行一次性命令 | |
+| `lane reset` | 重置私有数据目录并重新触发 setup hooks | |
+| `lane done` | 安全销毁工作区及分支（要求代码已推送保存）| `--force` |
+| `lane gc` | 垃圾回收过期、已被物理删除的残留登记 | `--dry-run`, `--json` |
+| `lane doctor` | 检查并诊断运行环境依赖与状态健康度 | `--fix`, `--json` |
+| `lane open <port>` | 在宿主默认浏览器中打开对应服务的发布地址 | `--json` |
+| `lane skill install` | 将嵌入的 `SKILL.md` 重新安装到 Agent 目录 | |
+| `lane hook install` | 安装 Cursor / Claude Code 的 worktree hook | `[cursor\|claude\|all]` |
+
+---
 
 ## 开发与验证
 
+项目遵循严苛的代码质量与幂等性保障规则，提交前须执行：
+
 ```sh
+test -z "$(gofmt -l cmd internal)"
+go vet ./cmd/... ./internal/...
 go test ./cmd/... ./internal/...
 go test -race ./cmd/... ./internal/...
-go vet ./cmd/... ./internal/...
+go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./cmd/... ./internal/...
 go build ./cmd/lane
 ```
 
-CI 在 Linux/macOS/Windows 运行核心测试与真实原生 CLI 验收：并行工作区、HTTP、JSON、hooks、参数与退出码、重启、reset 和清理。Linux 另运行真实容器端到端测试：同端口并行、宿主回环不串线、相同 runtime 中的测试命令、Git worktree、独立数据、实例复用、reset、取消与清理。
+准备好固定版本的 process-compose（运行 `lane doctor --fix` 并将其加入 PATH）后，可运行端到端测试：
+- 原生多工作区并发测试：`python tests/native_e2e.py ./lane`（Windows 使用 `./lane.exe`）
+- 容器多工作区端到端测试：`python3 tests/container_e2e.py ./lane lane-runtime:local`
 
-准备好固定版本的 process-compose（`lane doctor --fix`，并将其目录加入 PATH）后，可执行 `python tests/native_e2e.py ./lane`（Windows 使用 `./lane.exe`）。容器验收命令为 `python3 tests/container_e2e.py ./lane lane-runtime:local`，镜像按前文提前构建。
-
-macOS/Windows 的容器引擎行为还需在实际 Docker Desktop/Podman Machine 环境验收；交叉编译不是端到端验证。测试范围与边界见 [架构记录](docs/architecture.md)。
+更多底层设计细节详见 [架构设计记录 (docs/architecture.md)](docs/architecture.md)。

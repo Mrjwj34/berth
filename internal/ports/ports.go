@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 )
 
 const (
@@ -61,21 +60,4 @@ func Free(port int) bool {
 	// Closing is not always instant on some stacks; a short pause is unnecessary
 	// because we only need the probe result.
 	return true
-}
-
-func WaitFree(ctx context.Context, port int, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for {
-		if Free(port) {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("port %d still in use", port)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(50 * time.Millisecond):
-		}
-	}
 }

@@ -60,17 +60,6 @@ func TestWriteEnvFileManagedBlock(t *testing.T) {
 	}
 }
 
-func TestFindMissingUsesDefaults(t *testing.T) {
-	dir := t.TempDir()
-	cfg, root, err := Find(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Base != "main" || root != dir {
-		t.Fatalf("cfg=%+v root=%s", cfg, root)
-	}
-}
-
 func TestDuplicatePortsRejected(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, Filename)
