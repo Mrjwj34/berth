@@ -32,12 +32,13 @@ type Proc struct {
 }
 
 type pcProcess struct {
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	IsReady   string `json:"is_ready"`
-	PID       int    `json:"pid"`
-	ExitCode  int    `json:"exit_code"`
-	Namespace string `json:"namespace"`
+	Name          string `json:"name"`
+	Status        string `json:"status"`
+	IsReady       string `json:"is_ready"`
+	HasReadyProbe bool   `json:"has_ready_probe"`
+	PID           int    `json:"pid"`
+	ExitCode      int    `json:"exit_code"`
+	Namespace     string `json:"namespace"`
 }
 
 func PCFile(worktree string) string { return filepath.Join(config.LaneDir(worktree), "pc.yaml") }
@@ -314,7 +315,8 @@ func DecodeStatus(data []byte) ([]Proc, error) {
 	}
 	procs := make([]Proc, 0, len(raw))
 	for _, p := range raw {
-		healthy := strings.EqualFold(p.Status, "Running") && (strings.EqualFold(p.IsReady, "Ready") || strings.EqualFold(p.IsReady, "N/A") || p.IsReady == "")
+		// process-compose reports "-" both without probes and before probes finish.
+		healthy := strings.EqualFold(p.Status, "Running") && (strings.EqualFold(p.IsReady, "Ready") || (!p.HasReadyProbe && p.IsReady == "-"))
 		procs = append(procs, Proc{Name: p.Name, Status: p.Status, Ready: p.IsReady, PID: p.PID, Exit: p.ExitCode, Healthy: healthy})
 	}
 	return procs, nil

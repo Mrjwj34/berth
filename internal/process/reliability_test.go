@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +24,31 @@ func TestUnknownAndFailedAreNotReady(t *testing.T) {
 	defer cancel()
 	if err := WaitReady(ctx, func(context.Context) ([]Proc, error) { return nil, nil }); err == nil {
 		t.Fatal("empty process list treated as ready")
+	}
+}
+func TestReadinessMatchesSupervisorProbeState(t *testing.T) {
+	for _, tc := range []struct {
+		name, status, ready string
+		probe, want         bool
+	}{
+		{"running without probe", "Running", "-", false, true},
+		{"probe pending", "Running", "-", true, false},
+		{"probe ready", "Running", "Ready", true, true},
+		{"probe failed", "Running", "Not Ready", true, false},
+		{"unknown health", "Running", "Unknown", false, false},
+		{"missing health", "Running", "", true, false},
+		{"not running", "Pending", "-", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := fmt.Sprintf(`[{"name":"web","status":%q,"is_ready":%q,"has_ready_probe":%t}]`, tc.status, tc.ready, tc.probe)
+			procs, err := DecodeStatus([]byte(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := allReady(procs); got != tc.want {
+				t.Fatalf("readiness = %t, want %t: %s", got, tc.want, raw)
+			}
+		})
 	}
 }
 func TestRenderPreservesNumericStrings(t *testing.T) {

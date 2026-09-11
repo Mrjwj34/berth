@@ -95,6 +95,11 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		pcPort = l.Addr().(*net.TCPAddr).Port
 		_ = l.Close()
 	}
+	t.Cleanup(func() {
+		if err := Down(context.Background(), dir); err != nil {
+			t.Errorf("stop test supervisor: %v", err)
+		}
+	})
 	if err := Up(ctx, dir, env, pcPort); err != nil {
 		if data, readErr := os.ReadFile(LogFile(dir)); readErr == nil {
 			t.Logf("supervisor log:\n%s", data)
@@ -112,7 +117,6 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		t.Logf("control endpoint=%s; query=%v; output=%s", Socket(dir), debugErr, out)
 		t.Fatal(err)
 	}
-	defer func() { _ = Down(ctx, dir) }()
 	if !Running(ctx, dir) {
 		t.Fatal("expected running")
 	}

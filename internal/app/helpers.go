@@ -198,7 +198,7 @@ func validateIdentity(ctx context.Context, ws state.Workspace) error {
 		return err
 	}
 	if !worktree.SamePath(dir, ws.GitDir) {
-		return fmt.Errorf("Git worktree identity changed")
+		return fmt.Errorf("worktree Git identity changed")
 	}
 	branch, err := gitx.CurrentBranch(ctx, ws.Path)
 	if err != nil {

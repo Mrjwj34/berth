@@ -29,6 +29,10 @@ engine; runtime.user can override the default. Native Linux uses the host UID/GI
 inside Docker; rootless Podman uses keep-id. Rootless Docker may require an explicit
 runtime.user override matching its user namespace.
 
+`up` waits for declared health probes to report ready. A running process without
+a probe is accepted as started; this does not guarantee its application endpoint
+is ready. Declare a readiness probe when dependent commands need that guarantee.
+
 `ports` names host publications. `listen` specifies their original TCP port in
 container mode. Every named port requires a listen value. Internal services can
 also use undeclared ports, but lane does not dynamically discover/publish them.
