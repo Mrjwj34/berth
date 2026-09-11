@@ -146,7 +146,7 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int,
 		}
 	}
 	args = append(args, clientArgs(worktree, pcPort)...)
-	fullEnv := config.Environ(os.Environ(), env)
+	fullEnv := config.Environ(os.Environ(), remap.WithoutPreload(env))
 	if supervise {
 		if err := remap.Spawn(ctx, worktree, bin, args, fullEnv); err != nil {
 			return err

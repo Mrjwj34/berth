@@ -50,6 +50,22 @@ func Environ(base []string, worktree string) []string {
 	return config.Environ(base, EnvVars(worktree))
 }
 
+// WithoutPreload drops interceptor libraries so process-compose itself is
+// not rewritten. Child processes still receive EnvVars via pc.yaml.
+func WithoutPreload(env map[string]string) map[string]string {
+	if env == nil {
+		return nil
+	}
+	out := make(map[string]string, len(env))
+	for k, v := range env {
+		if k == "LD_PRELOAD" || k == "DYLD_INSERT_LIBRARIES" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
 func joinPreload(existing, lib string) string {
 	if lib == "" {
 		return existing

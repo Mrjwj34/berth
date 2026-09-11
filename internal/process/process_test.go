@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -110,9 +111,6 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 	if !remap.Available() {
 		t.Skip("C compiler not available to build remap library")
 	}
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not available")
-	}
 	if _, err := LookPath(); err != nil {
 		if _, err := Ensure(context.Background()); err != nil {
 			t.Skip(err)
@@ -121,6 +119,11 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 	t.Setenv("LANE_HOME", t.TempDir())
 	dir := t.TempDir()
 	if err := os.MkdirAll(config.LaneDir(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	server := filepath.Join(dir, "httpserver")
+	if err := remap.CompileHTTPServer(ctx, server); err != nil {
 		t.Fatal(err)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -137,13 +140,12 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 	}
 	procs := map[string]any{
 		"api": map[string]any{
-			"command": "python3 -m http.server 18082 --bind 127.0.0.1",
+			"command": server + " 18082",
 		},
 	}
 	if err := Render(dir, procs, env, nil); err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
 	maps := []remap.Mapping{{Name: "api", Host: host, Listen: listen}}
 	if err := Up(ctx, dir, env, 0, maps, true); err != nil {
 		t.Fatal(err)

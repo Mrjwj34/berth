@@ -62,14 +62,14 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("preload remap is linux/darwin")
 	}
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not available")
-	}
 	home := t.TempDir()
 	t.Setenv("LANE_HOME", home)
 	ctx := context.Background()
-	lib, err := EnsureLib(ctx)
-	if err != nil {
+	if _, err := EnsureLib(ctx); err != nil {
+		t.Fatal(err)
+	}
+	server := filepath.Join(t.TempDir(), "httpserver")
+	if err := CompileHTTPServer(ctx, server); err != nil {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
@@ -81,17 +81,8 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	if err := Setup(ctx, dir, []Mapping{{Name: "api", Listen: listen, Host: host}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	env := append(os.Environ(),
-		"LANE_REMAP=1",
-		"LANE_REMAP_FILE="+TablePath(dir),
-	)
-	if runtime.GOOS == "darwin" {
-		env = append(env, "DYLD_INSERT_LIBRARIES="+lib)
-	} else {
-		env = append(env, "LD_PRELOAD="+lib)
-	}
-	cmd := exec.Command("python3", "-m", "http.server", strconv.Itoa(listen), "--bind", "127.0.0.1")
-	cmd.Env = env
+	cmd := exec.Command(server, strconv.Itoa(listen))
+	cmd.Env = Environ(os.Environ(), dir)
 	cmd.Dir = dir
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -104,15 +95,12 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 		t.Fatal("hardcoded listen port leaked onto the host")
 	}
 
-	pub := exec.Command("python3", "-c", `
-import socket, sys
-s = socket.socket()
-s.settimeout(5)
-s.connect(("1.1.1.1", 443))
-s.close()
-print("ok")
-`)
-	pub.Env = env
+	client := filepath.Join(t.TempDir(), "publicconnect")
+	if err := CompilePublicConnect(ctx, client); err != nil {
+		t.Fatal(err)
+	}
+	pub := exec.Command(client)
+	pub.Env = Environ(os.Environ(), dir)
 	out, err := pub.CombinedOutput()
 	if err != nil {
 		t.Skipf("public connect skipped: %v\n%s", err, out)
@@ -171,9 +159,6 @@ func TestTwoWorkspacesSameListenPort(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("preload remap is linux/darwin")
 	}
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not available")
-	}
 	home := t.TempDir()
 	t.Setenv("LANE_HOME", home)
 	ctx := context.Background()
@@ -215,11 +200,13 @@ func startRemappedHTTP(t *testing.T, ctx context.Context, listen int) remappedHT
 	if err := Setup(ctx, dir, []Mapping{{Name: "api", Listen: listen, Host: host}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	env := ApplyMap(map[string]string{}, dir)
-	cmd := exec.Command("python3", "-m", "http.server", strconv.Itoa(listen), "--bind", "127.0.0.1")
+	server := filepath.Join(t.TempDir(), "httpserver")
+	if err := CompileHTTPServer(ctx, server); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(server, strconv.Itoa(listen))
 	cmd.Dir = dir
 	cmd.Env = Environ(os.Environ(), dir)
-	_ = env
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
