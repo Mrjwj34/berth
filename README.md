@@ -1,17 +1,22 @@
-<div align="center">
-  <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" width="120" />
-  <h1>lane</h1>
-  <p>Fast, low-cost management of parallel development environments</p>
-  <p>
-    <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-    <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
-    <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
-  </p>
-  <p>
-    <a href="README.zh-CN.md">简体中文</a> | English
-  </p>
-</div>
+<table>
+  <tr>
+    <td width="140" align="center" valign="middle">
+      <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" width="120" />
+    </td>
+    <td valign="middle">
+      <p><strong>Fast, low-cost management of parallel development environments</strong></p>
+      <p>
+        <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+        <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
+        <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
+        <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
+      </p>
+      <p>
+        <a href="README.zh-CN.md">简体中文</a> | English
+      </p>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
@@ -32,7 +37,7 @@ lane separates workspace management from the execution context. Each workspace h
 
 ## Quick Start
 
-### Installation
+### 1. Install lane
 
 Download prebuilt binaries from GitHub Releases:
 
@@ -52,23 +57,26 @@ cd lane
 go build -o bin/lane ./cmd/lane
 ```
 
-### Initialize a project
+### 2. Initialize your project
 
 Run init in the root of your Git repository:
 
 ```sh
 lane init
-```
-
-This creates a default lane.yaml and installs the skill file into your agent directories. If you use Cursor or Claude Code worktrees, install the hooks:
-
-```sh
 lane hook install all
 ```
 
-### Configure lane.yaml
+This installs the skill definitions into your agent directories for Claude Code and Cursor, and sets up editor hooks.
 
-Define the base branch, exposed ports, and managed processes:
+### 3. Let your Agent configure the workspace
+
+Prompt your coding agent:
+
+> Inspect this repository and configure lane.yaml based on existing startup scripts, toolchains, and listen ports.
+
+The agent reads the embedded skill, inspects project scripts and configuration files, and declares appropriate ports and processes in lane.yaml.
+
+If you prefer manual configuration, edit lane.yaml directly:
 
 ```yaml
 version: 1
@@ -83,34 +91,28 @@ processes:
       http_get: {host: 127.0.0.1, port: "${LANE_PORT_WEB}", path: /}
 ```
 
-### Manage workspaces
+### 4. Create and run workspaces
 
-Create and start a new workspace:
+Prompt your agent to work in an isolated environment, or run the command directly:
 
 ```sh
 lane new feature-a --up
 ```
 
-Inspect active workspaces and allocated ports:
+View active workspaces:
 
 ```sh
 lane ls --json
 lane status feature-a
 ```
 
-Run one-off commands inside the workspace context:
+Run tests or commands within the workspace environment:
 
 ```sh
 lane run -- npm test
 ```
 
-Stop processes when paused:
-
-```sh
-lane down feature-a
-```
-
-Safely remove the workspace when work is pushed or merged:
+When work is finished and commits are pushed:
 
 ```sh
 lane done feature-a
@@ -118,5 +120,6 @@ lane done feature-a
 
 ## Detailed Documentation
 
+- User Guide: [docs/features.md](docs/features.md) introduces practical workflows, data isolation, and agent integrations.
 - Runtime contract: [docs/runtime.md](docs/runtime.md) covers networking, port allocation, container behavior, and lifecycle guarantees.
 - Architecture decisions: [docs/architecture.md](docs/architecture.md) explains the daemonless lock model, state recovery, and safety invariants.

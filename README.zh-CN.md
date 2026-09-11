@@ -1,17 +1,22 @@
-<div align="center">
-  <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" width="120" />
-  <h1>lane</h1>
-  <p>快速、低成本地管理并行开发环境</p>
-  <p>
-    <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-    <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
-    <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
-  </p>
-  <p>
-    简体中文 | <a href="README.md">English</a>
-  </p>
-</div>
+<table>
+  <tr>
+    <td width="140" align="center" valign="middle">
+      <img src="https://cdn.jwjbox.dev/lane.png" alt="lane logo" width="120" />
+    </td>
+    <td valign="middle">
+      <p><strong>快速、低成本地管理并行开发环境</strong></p>
+      <p>
+        <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+        <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
+        <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
+        <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
+      </p>
+      <p>
+        简体中文 | <a href="README.md">English</a>
+      </p>
+    </td>
+  </tr>
+</table>
 
 ## 功能特性
 
@@ -32,7 +37,7 @@ lane 将工作区生命周期管理与底层执行环境解耦。每个工作区
 
 ## 快速开始
 
-### 安装方式
+### 1. 安装 lane
 
 下载预编译二进制包：
 
@@ -52,23 +57,26 @@ cd lane
 go build -o bin/lane ./cmd/lane
 ```
 
-### 初始化项目
+### 2. 初始化项目
 
-在 Git 仓库根目录下执行初始化命令：
+在 Git 仓库根目录下执行：
 
 ```sh
 lane init
-```
-
-该命令会生成默认的 lane.yaml 文件，并将技能定义安装到 Agent 对应目录。如果使用 Cursor 或 Claude Code 工作区集成，可以安装钩子脚本：
-
-```sh
 lane hook install all
 ```
 
-### 配置 lane.yaml
+此操作会生成基础模板，自动将技能定义分发至 Claude Code 与 Cursor 目录，并配置工作区生命周期钩子。
 
-声明基线分支、端口需求以及受管进程：
+### 3. 让 Agent 自动配置工作区
+
+直接向你的编程助手发送提示词：
+
+> 检查当前仓库，根据现有的启动脚本、环境依赖与监听端口，自动完成 lane.yaml 配置。
+
+Agent 会自动读取内置的技能定义，分析项目文件并生成匹配的端口与进程定义。
+
+如果选择手动配置，可以直接编辑项目根目录下的 lane.yaml 文件：
 
 ```yaml
 version: 1
@@ -83,34 +91,28 @@ processes:
       http_get: {host: 127.0.0.1, port: "${LANE_PORT_WEB}", path: /}
 ```
 
-### 管理工作区
+### 4. 创建与运行工作区
 
-创建并启动新工作区：
+可以让 Agent 直接创建环境，也可以在终端执行：
 
 ```sh
 lane new feature-a --up
 ```
 
-查看当前工作区列表与分配的端口：
+查看当前工作区列表与状态：
 
 ```sh
 lane ls --json
 lane status feature-a
 ```
 
-在当前工作区环境中执行单次测试或命令：
+在当前工作区环境中执行测试或命令：
 
 ```sh
 lane run -- npm test
 ```
 
-暂停并停止当前工作区服务：
-
-```sh
-lane down feature-a
-```
-
-提交或合并改动后安全销毁工作区：
+开发完成并将提交推送保存后，安全销毁工作区：
 
 ```sh
 lane done feature-a
@@ -118,5 +120,6 @@ lane done feature-a
 
 ## 详细文档
 
+- 用户指南：[docs/features.md](docs/features.md) 介绍具体的工作流、数据隔离策略以及 Agent 工具集成
 - 运行时契约：[docs/runtime.md](docs/runtime.md) 详细说明网络模式、端口映射、容器运行方式与生命周期规则
 - 架构设计记录：[docs/architecture.md](docs/architecture.md) 详细介绍无守护进程锁设计、状态恢复机制与安全不变式
