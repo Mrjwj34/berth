@@ -24,7 +24,7 @@ func cmdInit(asJSON *bool) *cobra.Command {
 				if *asJSON {
 					return writeJSON(cmd.OutOrStdout(), map[string]any{"ok": true, "file": "lane.yaml"})
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "wrote lane.yaml and installed skill. Edit ports/processes, then: lane new smoke --up")
+				fmt.Fprintln(cmd.OutOrStdout(), "wrote lane.yaml and installed .agents/skills/lane/SKILL.md. Edit ports/processes, then: lane new smoke --up")
 				return nil
 			})
 		},
@@ -375,13 +375,13 @@ func cmdSkill() *cobra.Command {
 	c := &cobra.Command{Use: "skill", Short: "Skill asset commands"}
 	c.AddCommand(&cobra.Command{
 		Use:   "install",
-		Short: "Install the embedded SKILL.md into agent skill directories",
+		Short: "Install the embedded SKILL.md into .agents/skills/lane",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withApp(func(ctx context.Context, a *app.App) error {
 				if err := a.SkillInstall(ctx); err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "installed skill into .agents/skills/lane, .claude/skills/lane, .cursor/skills/lane")
+				fmt.Fprintln(cmd.OutOrStdout(), "installed skill into .agents/skills/lane")
 				return nil
 			})
 		},
@@ -392,8 +392,8 @@ func cmdSkill() *cobra.Command {
 func cmdHook() *cobra.Command {
 	c := &cobra.Command{Use: "hook", Short: "Optional harness adapters"}
 	c.AddCommand(&cobra.Command{
-		Use:   "install [cursor|claude|all]",
-		Short: "Write Cursor worktrees.json and/or Claude Code hooks",
+		Use:   "install [cursor|all]",
+		Short: "Merge the Cursor worktree adapter into .cursor/worktrees.json",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			which := "all"
@@ -404,7 +404,7 @@ func cmdHook() *cobra.Command {
 				if err := a.HookInstall(ctx, which); err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "installed %s hooks\n", which)
+				fmt.Fprintln(cmd.OutOrStdout(), "installed the Cursor worktree adapter into .cursor/worktrees.json")
 				return nil
 			})
 		},

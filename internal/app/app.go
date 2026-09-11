@@ -180,6 +180,12 @@ func (a *App) Adopt(ctx context.Context, setup bool) (*WorkspaceView, error) {
 		if err != nil {
 			return nil, err
 		}
+		// git rev-parse --abbrev-ref HEAD reports "HEAD" instead of failing on a
+		// detached checkout, and harness-created worktrees are commonly detached.
+		// Registering one would record a branch that does not exist.
+		if branch == "HEAD" {
+			return nil, fmt.Errorf("checkout is on a detached HEAD; lane workspaces need a branch. Check out a branch, or create a lane workspace with lane new <slug>")
+		}
 		gitDir, err := gitx.Run(ctx, top, "rev-parse", "--absolute-git-dir")
 		if err != nil {
 			return nil, err

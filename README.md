@@ -7,12 +7,18 @@
   <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
-  <br><br>
-  <a href="README.zh-CN.md">简体中文</a> | English
 </p>
 <br clear="left" />
 
+<p align="center">
+  English | <a href="README.zh-CN.md">简体中文</a>
+</p>
+
 lane provisions lightweight, isolated local workspaces for parallel agent programming, combining Git worktrees, private data directories, dynamic port assignment, and supervised processes without virtual machine overhead.
+
+<p align="center">
+  <img src="https://cdn.jwjbox.dev/berth-demo.gif" alt="berth demo" width="760" />
+</p>
 
 ## Install
 
@@ -49,7 +55,7 @@ lane init
 lane hook install all
 ```
 
-This generates a base template, installs the skill definition into agent directories for tools like Claude Code and Cursor, and configures worktree hooks.
+This generates a base template, installs the agent skill to `.agents/skills/lane` for Cursor, Codex, pi and Antigravity, and merges the Cursor worktree adapter into `.cursor/worktrees.json`.
 
 ### 2. Let your Agent configure lane.yaml
 
