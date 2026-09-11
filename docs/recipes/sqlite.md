@@ -4,7 +4,7 @@
 
 The project can use a file-backed SQLite database. lane has no SQLite type and starts no database process — point the app at a file under `LANE_DATA_DIR`. That file is private to the worktree and is destroyed with the workspace.
 
-No datastore port is required. If the app itself listens, declare that port and read it from env. Never hardcode ports. Discover assigned app ports with `lane ports --json` or `lane status --json`.
+No datastore port is required. If the app itself listens on a hardcoded port, declare `listen:` — do not rewrite the app. Discover the host-published port with `lane ports --json`.
 
 ## `lane.yaml` fragment
 

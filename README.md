@@ -18,7 +18,7 @@
 在本地并发运行多个 AI Coding Agent（如 Cursor、Claude Code、Codex）时，传统的容器与虚拟机方案通常面临以下痛点：
 
 1. **资源开销与冷启动高昂**：macOS Virtualization 内存不完全归还宿主，每个任务分配 VM 会迅速消耗几十 GB 内存；virtiofs 跨层文件 I/O 导致构建和依赖安装以分钟计。
-2. **环境隔离需求明确**：Agent 往往只需要独立的**端口**（避免 `Address already in use`）和独立的**数据库/存储路径**（避免相互踩数据），并非一定要完整的操作系统层隔离。
+  2. **环境隔离需求明确**：Agent 往往只需要独立的**端口**（避免 `Address already in use`）和独立的**数据库/存储路径**（避免相互踩数据），并非一定要完整的操作系统层隔离。项目写死 `:8080` 时，由 lane 做网络隔离与宿主发布，而不是倒逼项目改读 `PORT`。
 3. **脆弱的快照与绑定**：许多方案依赖只读主分支快照或特定 Harness 的专有生命周期，无法跨工具无缝流转。
 
 `lane` 采用 **原生进程 + 端口/数据目录分区** 的极简设计：
@@ -33,7 +33,7 @@
 - 🔌 **组件中立（一切皆进程）**：不绑定任何具体数据库或服务。Postgres、MySQL、Redis、Elasticsearch、SQLite 甚至 Docker 容器，在 `lane` 看来都只是由项目声明的普通进程。
 - 🧱 **分层渐进接入**：
   - **L0**：纯 Worktree（零配置，任何 Git 仓库直接运行 `lane new / ls / done`）。
-  - **L1**：端口与环境变量派生（`lane.yaml` 声明命名端口、`LANE_DATA_DIR` 与 setup 钩子）。
+  - **L1**：端口与环境变量派生（`lane.yaml` 声明命名端口或 `listen:` 硬编码端口、`LANE_DATA_DIR` 与 setup 钩子）。
   - **L2**：受管进程（直通 process-compose，后台守护并自动做就绪探测）。
 - 🤖 **Agent 优先 & Harness 无关**：
   - 随二进制内嵌开放标准 `SKILL.md`，Agent 读懂后自主完成项目配置与 smoke 自测。
@@ -58,7 +58,7 @@ flowchart LR
 
   subgraph Lane ["lane CLI (Go 单二进制)"]
     Registry["~/.lane/state.json\n(全局端口块 / 锁 / GC)"]
-    Prim["隔离原语: LANE_PORT_* / LANE_DATA_DIR / env / hooks"]
+    Prim["隔离原语: listen 声明 / LANE_PORT_* 发布 / LANE_DATA_DIR / env / hooks"]
     GC["内建自动 GC"]
   end
 
@@ -85,9 +85,21 @@ flowchart LR
 ```yaml
 version: 1
 base: main                                   # 基准基线分支，创建分支默认前缀 lane/
-ports: [web, api, pg, redis]                 # 自动映射为 LANE_PORT_WEB, LANE_PORT_API 等
+
+# 声明项目已经在听的端口。lane 分配唯一宿主端口 LANE_PORT_* 并做发布，
+# 不要求应用改读 PORT / LANE_PORT_*。
+ports:
+  web:
+    listen: 5173
+  api:
+    listen: 8080
+  pg:
+    listen: 5432
+  redis:
+    listen: 6379
 
 env:
+  # 给宿主侧（浏览器、lane open、其他工作区）用的地址
   DATABASE_URL: postgres://localhost:${LANE_PORT_PG}/app
   REDIS_URL: redis://127.0.0.1:${LANE_PORT_REDIS}
   VITE_API_URL: http://127.0.0.1:${LANE_PORT_API}
@@ -101,28 +113,30 @@ hooks:
     - initdb -D "$LANE_DATA_DIR/pg" -U app && ./scripts/seed.sh
   teardown: []                               # 销毁前钩子
 
-processes:                                   # process-compose 语法，直通执行
+processes:                                   # process-compose 语法，直通执行；命令保持项目原样
   pg:
-    command: postgres -D "$LANE_DATA_DIR/pg" -p "$LANE_PORT_PG" -k "$LANE_DATA_DIR"
+    command: postgres -D "$LANE_DATA_DIR/pg" -k "$LANE_DATA_DIR"
     readiness_probe:
       exec:
-        command: pg_isready -p "$LANE_PORT_PG"
+        command: pg_isready -p 5432
   api:
-    command: PORT=$LANE_PORT_API go run ./cmd/server
+    command: go run ./cmd/server
     depends_on:
       pg: { condition: process_healthy }
     readiness_probe:
       http_get:
-        port: "$LANE_PORT_API"
+        port: 8080
         path: /healthz
   web:
-    command: npm run dev -- --port "$LANE_PORT_WEB" --strictPort
+    command: npm run dev
 
 gc:
   idle_stop_hours: 4                         # 超过 4 小时无活动自动停机进程
   remove_after_days: 7                       # 分支已合并且超过 7 天自动移除
   max_workspaces: 8                          # 超过最大配额时淘汰最旧的干净工作区
 ```
+
+进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`，把 `$LANE_PORT_*` 传给命令。那是可选便利，不是项目改造要求。`listen:` 在 Linux 上通过 user+net namespace 隔离 bind：工作区内部 `localhost:8080` 照旧可用，宿主通过 `lane ports --json` 拿到唯一发布端口。macOS / Windows 暂不支持同一硬编码端口的并行监听。
 
 ---
 

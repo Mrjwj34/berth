@@ -4,7 +4,7 @@
 
 The project already has a container image and you want that container bound to this workspace's ports and (optionally) data dir. lane does not know Docker. `docker run --rm --name ... -p $LANE_PORT_X:...` is an ordinary `processes` command, same as a native binary.
 
-The app must read published ports from env (`LANE_PORT_*`). Never hardcode host ports. Discover the assigned port with `lane ports --json` or `lane status --json`. Prefer a native binary (see the other recipes) when the tool is already installed — Docker is optional, not a lane feature.
+Map the workspace host port on the left of `-p` (`$LANE_PORT_X:containerPort`). The container may keep its own listen port. Discover the host-published port with `lane ports --json`. Prefer a native binary (see the other recipes) when the tool is already installed — Docker is optional, not a lane feature.
 
 ## `lane.yaml` fragment
 

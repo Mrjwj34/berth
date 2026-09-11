@@ -71,6 +71,62 @@ func TestFindMissingUsesDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadListenPorts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, Filename)
+	content := `
+version: 1
+ports:
+  api: 8080
+  web:
+    listen: 5173
+  extra:
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Ports.NeedsIsolate() {
+		t.Fatal("expected isolate")
+	}
+	got := cfg.Ports.ListenMap()
+	if got["api"] != 8080 || got["web"] != 5173 {
+		t.Fatalf("listen map: %+v", got)
+	}
+	names := cfg.Ports.Names()
+	if len(names) != 3 {
+		t.Fatalf("names: %v", names)
+	}
+	if ListenEnvName("api") != "LANE_LISTEN_API" {
+		t.Fatalf("listen env: %s", ListenEnvName("api"))
+	}
+}
+
+func TestLoadListenPortListObjects(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, Filename)
+	content := `
+version: 1
+ports:
+  - name: api
+    listen: 8080
+  - web
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Ports) != 2 || cfg.Ports[0].Listen != 8080 || cfg.Ports[1].Name != "web" {
+		t.Fatalf("ports: %+v", cfg.Ports)
+	}
+}
+
 func TestDuplicatePortsRejected(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, Filename)

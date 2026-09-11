@@ -18,7 +18,7 @@ type Config struct {
 	Version      int               `yaml:"version" json:"version"`
 	Base         string            `yaml:"base" json:"base"`
 	WorktreeRoot string            `yaml:"worktree_root,omitempty" json:"worktree_root,omitempty"`
-	Ports        []string          `yaml:"ports" json:"ports"`
+	Ports        Ports             `yaml:"ports" json:"ports"`
 	Env          map[string]string `yaml:"env" json:"env,omitempty"`
 	EnvFile      string            `yaml:"env_file,omitempty" json:"env_file,omitempty"`
 	CopyDirs     []string          `yaml:"copy_dirs,omitempty" json:"copy_dirs,omitempty"`
@@ -79,16 +79,19 @@ func (c *Config) validate() error {
 		return fmt.Errorf("unsupported version %d (supported: 1)", c.Version)
 	}
 	seen := map[string]struct{}{}
-	for _, name := range c.Ports {
-		if name == "" {
+	for _, port := range c.Ports {
+		if port.Name == "" {
 			return fmt.Errorf("ports: empty name")
 		}
-		if strings.ContainsAny(name, " \t") {
-			return fmt.Errorf("ports: %q contains whitespace", name)
+		if strings.ContainsAny(port.Name, " \t") {
+			return fmt.Errorf("ports: %q contains whitespace", port.Name)
 		}
-		key := strings.ToLower(name)
+		if port.Listen < 0 || port.Listen > 65535 {
+			return fmt.Errorf("ports.%s: listen %d is not a valid TCP port", port.Name, port.Listen)
+		}
+		key := strings.ToLower(port.Name)
 		if _, ok := seen[key]; ok {
-			return fmt.Errorf("ports: duplicate name %q", name)
+			return fmt.Errorf("ports: duplicate name %q", port.Name)
 		}
 		seen[key] = struct{}{}
 	}

@@ -5,7 +5,7 @@ description: Manage isolated local Agent workspaces with git worktrees, unique p
 
 # lane
 
-Project-agnostic, harness-agnostic local Agent workspace CLI. Isolation primitives only: Git worktree, named port block (`LANE_PORT_<NAME>`), private `LANE_DATA_DIR`, project-declared processes. Identity is the directory path. lane does not know Postgres, MySQL, Redis, or any other service.
+Project-agnostic, harness-agnostic local Agent workspace CLI. Isolation primitives only: Git worktree, named port block (`LANE_PORT_<NAME>` published on the host), private `LANE_DATA_DIR`, project-declared processes. Identity is the directory path. lane does not know Postgres, MySQL, Redis, or any other service. Do not change a project so it can run under lane.
 
 ## 1. When to use
 
@@ -17,13 +17,14 @@ Do not use raw `git worktree`, process-compose, or hand-picked ports. Use this s
 
 When the repo has no `lane.yaml` (or it is incomplete), onboard it:
 
-1. **Read how the project starts.** Find the app, tests, and every datastore. Note every listen port and every on-disk path.
-2. **Make ports and data-dir env-driven.** Replace hardcoded `5432`, `3000`, `./data` with env. The app must read `LANE_PORT_*` and `LANE_DATA_DIR` (or values you derive into `DATABASE_URL`, `PORT`, etc.). Never hardcode ports. Discover assigned values with `lane status --json` / `lane ports --json`.
-3. **Write `lane.yaml`** at the repo root. Declare `ports`, `env`, `hooks.setup`, and `processes`. Recipes in `docs/recipes/` are ordinary processes — not first-class service types.
-4. **Self-test:** `lane new smoke --up`. Confirm readiness from JSON status/ports. Then `lane done smoke`.
-5. **Commit** `lane.yaml` (and `.worktreeinclude` / `env_file` if used).
+1. **Read how the project starts.** Find the app, tests, and every datastore. Note every listen port and every on-disk path. Leave those ports and commands as the project wrote them.
+2. **Declare reality in `lane.yaml`, do not rewrite the app.** For each hardcoded bind (API `:8080`, Vite `5173`, …) record `listen:` so lane can isolate and publish a unique host port. Intra-workspace `localhost:8080` keeps working. Host-facing clients use `LANE_PORT_*` from `lane ports --json`. Only if a process already accepts `--port` / `$PORT` may you use the short form `ports: [api]` and pass `$LANE_PORT_API`.
+3. **Private data only when the project shares a path across checkouts.** Point those paths at `$LANE_DATA_DIR`. Do not invent env-driven ports just so lane can start.
+4. **Write `lane.yaml`** at the repo root. Declare `ports`, `env` (URLs that *other* tools need on the host), `hooks.setup`, and `processes`. Recipes in `docs/recipes/` are ordinary processes — not first-class service types.
+5. **Self-test:** `lane new smoke --up`. Confirm readiness from JSON status/ports. Then `lane done smoke`.
+6. **Commit** `lane.yaml` (and `.worktreeinclude` / `env_file` if used).
 
-Always-injected env: `LANE_DATA_DIR`, `LANE_WORKSPACE` (abs worktree path), `LANE_SLUG`, `LANE_ROOT` (main repo path), `LANE_BRANCH`, plus `LANE_PORT_<NAME>` for each declared port (name uppercased, `-` → `_`).
+Always-injected env: `LANE_DATA_DIR`, `LANE_WORKSPACE` (abs worktree path), `LANE_SLUG`, `LANE_ROOT` (main repo path), `LANE_BRANCH`, `LANE_PORT_<NAME>` (host-published port), and `LANE_LISTEN_<NAME>` when `listen:` is set.
 
 Default data dir: `<worktree>/.lane/data`. Branch created as `lane/<slug>` from `base` (default `main`). Worktree default path: sibling `<parent>/<reponame>.lanes/<slug>`.
 

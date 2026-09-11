@@ -20,8 +20,15 @@ var (
 )
 
 func PortEnvName(portName string) string {
+	return "LANE_PORT_" + envSuffix(portName)
+}
+
+func ListenEnvName(portName string) string {
+	return "LANE_LISTEN_" + envSuffix(portName)
+}
+
+func envSuffix(portName string) string {
 	var b strings.Builder
-	b.WriteString("LANE_PORT_")
 	for _, r := range portName {
 		switch {
 		case r == '-' || r == '.':

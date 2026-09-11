@@ -4,7 +4,7 @@
 
 The project needs a local Elasticsearch per workspace. lane has no Elasticsearch type — declare the `elasticsearch` binary as a process, set `http.port` from `LANE_PORT_ES`, and keep `path.data` / `path.logs` under `LANE_DATA_DIR`.
 
-The app must read the port from env (`ELASTICSEARCH_URL` / `LANE_PORT_ES`). Never hardcode `9200`. Discover the assigned port with `lane ports --json` or `lane status --json`.
+If Elasticsearch already binds `9200`, declare `listen: 9200` and keep the command unchanged. If the binary already accepts `http.port`, you may pass `$LANE_PORT_ES` instead. Discover the host-published port with `lane ports --json`.
 
 ## `lane.yaml` fragment
 

@@ -1,17 +1,24 @@
 package config
 
 const Template = `# lane.yaml — isolation primitives only. lane does not know any datastore.
-# Agent onboarding: read SKILL.md, make ports/data-dir env-driven, then
-#   lane new smoke --up
+# Agent onboarding: read SKILL.md, declare how the project already listens,
+# then: lane new smoke --up
 # and commit this file once the smoke workspace is healthy.
 version: 1
 base: main                                   # baseline branch; created branches use prefix lane/
 
-# Named ports become LANE_PORT_<NAME> (name uppercased, '-' -> '_').
-# ports: [web, api]
+# Record the TCP ports the process already binds. lane publishes a unique
+# host port as LANE_PORT_<NAME> and remaps it — do not change the project.
+# ports:
+#   api:
+#     listen: 8080
+#   web:
+#     listen: 5173
+#
+# Short form ports: [web, api] only allocates LANE_PORT_* for processes that
+# already accept --port / $PORT.
 
 # env:
-#   PORT: ${LANE_PORT_API}
 #   DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app
 
 # Optional dotenv managed block (# BEGIN LANE ... # END LANE)
@@ -31,7 +38,7 @@ hooks:
 #     command: go run ./cmd/server
 #     readiness_probe:
 #       http_get:
-#         port: "${LANE_PORT_API}"
+#         port: 8080
 #         path: /healthz
 
 gc:

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/Mrjwj34/lane/internal/config"
@@ -129,6 +130,11 @@ func (a *App) writeEnv(cfg *config.Config, ws state.Workspace) error {
 
 func workspaceEnv(cfg *config.Config, ws state.Workspace) map[string]string {
 	id := config.IdentityVars(ws.Path, ws.Slug, ws.Repo, ws.Branch, ws.Ports)
+	for _, p := range cfg.Ports {
+		if p.Listen > 0 {
+			id[config.ListenEnvName(p.Name)] = strconv.Itoa(p.Listen)
+		}
+	}
 	return config.MergeEnv(id, cfg.Env)
 }
 
@@ -145,6 +151,7 @@ func (a *App) view(ctx context.Context, ws state.Workspace, withEnv bool) (*Work
 		Repo:      ws.Repo,
 		Branch:    ws.Branch,
 		Ports:     ws.Ports,
+		Listen:    cfg.Ports.ListenMap(),
 		Running:   process.Running(ctx, ws.Path),
 		Dirty:     dirty,
 		CreatedAt: ws.CreatedAt,

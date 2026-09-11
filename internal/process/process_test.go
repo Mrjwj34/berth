@@ -79,7 +79,7 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err := Up(ctx, dir, env, 0); err != nil {
+	if err := Up(ctx, dir, env, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = Down(ctx, dir) }()

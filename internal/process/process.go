@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
+	"github.com/Mrjwj34/lane/internal/netns"
 	"gopkg.in/yaml.v3"
 )
 
@@ -107,24 +108,39 @@ func expandAny(v any, env map[string]string) any {
 	}
 }
 
-func Up(ctx context.Context, worktree string, env map[string]string, pcPort int) error {
+func Up(ctx context.Context, worktree string, env map[string]string, pcPort int, maps []netns.Mapping) error {
 	if _, err := os.Stat(PCFile(worktree)); err != nil {
 		return fmt.Errorf("no generated process file at %s. Add a processes: section to lane.yaml", PCFile(worktree))
 	}
 	if Running(ctx, worktree) {
 		return nil
 	}
+	_ = netns.Stop(worktree)
 	bin, err := Ensure(ctx)
 	if err != nil {
 		return err
 	}
 	args := []string{
-		"up", "-D", "-t=false",
+		"up", "-t=false",
 		"-f", PCFile(worktree),
 		"--disable-dotenv",
 		"-L", LogFile(worktree),
 	}
+	if len(maps) == 0 {
+		args = []string{
+			"up", "-D", "-t=false",
+			"-f", PCFile(worktree),
+			"--disable-dotenv",
+			"-L", LogFile(worktree),
+		}
+	}
 	args = append(args, clientArgs(worktree, pcPort)...)
+	if len(maps) > 0 {
+		if err := netns.Start(ctx, worktree, maps, bin, args, config.Environ(os.Environ(), env)); err != nil {
+			return err
+		}
+		return waitReady(ctx, worktree, 60*time.Second)
+	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = worktree
 	cmd.Env = config.Environ(os.Environ(), env)
@@ -141,23 +157,27 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int)
 }
 
 func Down(ctx context.Context, worktree string) error {
-	if !Running(ctx, worktree) {
-		return nil
-	}
-	bin, err := LookPath()
-	if err != nil {
-		return err
-	}
-	args := append([]string{"down"}, clientArgs(worktree, readPCPort(worktree))...)
-	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Dir = worktree
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("process-compose down: %w\n%s", err, out)
+	var downErr error
+	if Running(ctx, worktree) {
+		bin, err := LookPath()
+		if err != nil {
+			downErr = err
+		} else {
+			args := append([]string{"down"}, clientArgs(worktree, readPCPort(worktree))...)
+			cmd := exec.CommandContext(ctx, bin, args...)
+			cmd.Dir = worktree
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				downErr = fmt.Errorf("process-compose down: %w\n%s", err, out)
+			}
+		}
 	}
 	_ = os.Remove(Socket(worktree))
 	_ = os.Remove(PortFile(worktree))
-	return nil
+	if err := netns.Stop(worktree); err != nil && downErr == nil {
+		return err
+	}
+	return downErr
 }
 
 func Status(ctx context.Context, worktree string) ([]Proc, error) {

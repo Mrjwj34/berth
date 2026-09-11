@@ -4,7 +4,7 @@
 
 The project needs a local MySQL (or MariaDB) per workspace. lane has no MySQL type — declare `mysqld` as a process, bind `--port` to `LANE_PORT_MYSQL`, and keep `--datadir` under `LANE_DATA_DIR`.
 
-The app must read the port from env (`DATABASE_URL` / `LANE_PORT_MYSQL`). Never hardcode `3306`. Discover the assigned port with `lane ports --json` or `lane status --json`.
+If MySQL already binds `3306`, declare `listen: 3306` and keep the command unchanged. If the binary already accepts `--port`, you may pass `$LANE_PORT_MYSQL` instead. Discover the host-published port with `lane ports --json`.
 
 ## `lane.yaml` fragment
 

@@ -23,16 +23,20 @@ func printWorkspace(w io.Writer, ws *app.WorkspaceView, asJSON bool) error {
 	fmt.Fprintf(w, "path\t%s\n", ws.Path)
 	fmt.Fprintf(w, "branch\t%s\n", ws.Branch)
 	if len(ws.Ports) > 0 {
-		fmt.Fprintf(w, "ports\t%s\n", formatPorts(ws.Ports))
+		fmt.Fprintf(w, "ports\t%s\n", formatPorts(ws.Ports, ws.Listen))
 	}
 	fmt.Fprintf(w, "running\t%v\n", ws.Running)
 	return nil
 }
 
-func formatPorts(ports map[string]int) string {
+func formatPorts(ports, listen map[string]int) string {
 	parts := make([]string, 0, len(ports))
 	for name, port := range ports {
-		parts = append(parts, fmt.Sprintf("%s=%d", name, port))
+		if l := listen[name]; l > 0 && l != port {
+			parts = append(parts, fmt.Sprintf("%s=%d->%d", name, port, l))
+		} else {
+			parts = append(parts, fmt.Sprintf("%s=%d", name, port))
+		}
 	}
 	return strings.Join(parts, " ")
 }
@@ -54,7 +58,7 @@ func printOverview(w io.Writer, list []app.WorkspaceView, asJSON bool) error {
 		if ws.Dirty {
 			status += "*"
 		}
-		fmt.Fprintf(w, "%-16s %-20s %-8s %-24s %s\n", ws.Slug, ws.Branch, status, formatPorts(ws.Ports), ws.Path)
+		fmt.Fprintf(w, "%-16s %-20s %-8s %-24s %s\n", ws.Slug, ws.Branch, status, formatPorts(ws.Ports, ws.Listen), ws.Path)
 	}
 	return nil
 }

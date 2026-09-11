@@ -4,7 +4,7 @@
 
 The project needs a local Redis per workspace. lane has no Redis type — declare `redis-server` as a process, bind `--port` to `LANE_PORT_REDIS`, and keep `--dir` under `LANE_DATA_DIR`.
 
-The app must read the port from env (`REDIS_URL` / `LANE_PORT_REDIS`). Never hardcode `6379`. Discover the assigned port with `lane ports --json` or `lane status --json`.
+If Redis already binds `6379`, declare `listen: 6379` and keep the command unchanged. If the binary already accepts `--port`, you may pass `$LANE_PORT_REDIS` instead. Discover the host-published port with `lane ports --json`.
 
 ## `lane.yaml` fragment
 

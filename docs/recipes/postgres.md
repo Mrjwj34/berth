@@ -4,7 +4,7 @@
 
 The project needs a local Postgres per workspace. lane has no Postgres type — declare `postgres` like any other process, bind it to `LANE_PORT_PG`, and keep files under `LANE_DATA_DIR`.
 
-The app must read the port from env (`DATABASE_URL` / `LANE_PORT_PG`). Never hardcode `5432`. Discover the assigned port with `lane ports --json` or `lane status --json`.
+If Postgres already binds `5432`, declare `listen: 5432` and keep the command unchanged. If the binary already accepts `-p`, you may pass `$LANE_PORT_PG` instead. Discover the host-published port with `lane ports --json`.
 
 ## `lane.yaml` fragment
 

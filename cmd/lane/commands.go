@@ -55,7 +55,7 @@ func cmdNew(asJSON *bool) *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "path\t%s\n", ws.Path)
 				fmt.Fprintf(cmd.OutOrStdout(), "branch\t%s\n", ws.Branch)
 				if len(ws.Ports) > 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "ports\t%s\n", formatPorts(ws.Ports))
+					fmt.Fprintf(cmd.OutOrStdout(), "ports\t%s\n", formatPorts(ws.Ports, ws.Listen))
 				}
 				fmt.Fprintln(cmd.OutOrStdout(), ws.Path)
 				return nil
@@ -177,9 +177,13 @@ func cmdPorts(asJSON *bool) *cobra.Command {
 					return err
 				}
 				if *asJSON {
-					return writeJSON(cmd.OutOrStdout(), map[string]any{"slug": ws.Slug, "path": ws.Path, "ports": ws.Ports})
+					return writeJSON(cmd.OutOrStdout(), map[string]any{"slug": ws.Slug, "path": ws.Path, "ports": ws.Ports, "listen": ws.Listen})
 				}
 				for name, port := range ws.Ports {
+					if l := ws.Listen[name]; l > 0 && l != port {
+						fmt.Fprintf(cmd.OutOrStdout(), "%s\t%d\tlisten=%d\n", name, port, l)
+						continue
+					}
 					fmt.Fprintf(cmd.OutOrStdout(), "%s\t%d\n", name, port)
 				}
 				return nil
