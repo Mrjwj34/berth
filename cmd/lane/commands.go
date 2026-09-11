@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Mrjwj34/lane/internal/app"
+	"github.com/Mrjwj34/lane/internal/remap"
 	"github.com/spf13/cobra"
 )
 
@@ -398,6 +399,17 @@ func cmdHook() *cobra.Command {
 		},
 	})
 	return c
+}
+
+func cmdRemapSupervise() *cobra.Command {
+	return &cobra.Command{
+		Use:    "remap-supervise -- <cmd> [args...]",
+		Hidden: true,
+		Args:   cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return remap.Supervise(cmd.Context(), args)
+		},
+	}
 }
 
 func cmdOpen(asJSON *bool) *cobra.Command {

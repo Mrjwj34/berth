@@ -1,0 +1,142 @@
+package remap
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+)
+
+func sourceHash() string {
+	sum := sha256.Sum256([]byte(preloadSrc + "\n" + wrapSrc + "\n" + runtime.GOOS + "\n" + runtime.GOARCH))
+	return hex.EncodeToString(sum[:12])
+}
+
+func hashPath(lib string) string { return lib + ".hash" }
+
+func libFresh(lib string) bool {
+	st, err := os.Stat(lib)
+	if err != nil || st.IsDir() || st.Size() == 0 {
+		return false
+	}
+	got, err := os.ReadFile(hashPath(lib))
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(got)) == sourceHash()
+}
+
+func compiler() (string, error) {
+	for _, name := range []string{"cc", "gcc", "clang"} {
+		if p, err := exec.LookPath(name); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("no C compiler (cc) on PATH. Install a compiler so lane can build the bind remap library, or run a single workspace")
+}
+
+// EnsureLib compiles the intercept library into $LANE_HOME/bin when missing or stale.
+func EnsureLib(ctx context.Context) (string, error) {
+	if runtime.GOOS == "windows" {
+		return "", fmt.Errorf("%w", errUnsupported)
+	}
+	lib := LibPath()
+	if libFresh(lib) && wrapFresh() {
+		return lib, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	cc, err := compiler()
+	if err != nil {
+		if st, stErr := os.Stat(lib); stErr == nil && !st.IsDir() && st.Size() > 0 {
+			return lib, nil
+		}
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(lib), 0o755); err != nil {
+		return "", err
+	}
+	dir, err := os.MkdirTemp("", "lane-remap-*")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	src := filepath.Join(dir, "preload.c")
+	if err := os.WriteFile(src, []byte(preloadSrc), 0o644); err != nil {
+		return "", err
+	}
+	tmp := filepath.Join(dir, libName())
+	args := []string{"-O2", "-o", tmp}
+	if runtime.GOOS == "darwin" {
+		args = append([]string{"-dynamiclib", "-fPIC"}, args...)
+	} else {
+		args = append([]string{"-shared", "-fPIC"}, args...)
+		args = append(args, "-ldl")
+	}
+	args = append(args, src)
+	cmd := exec.CommandContext(ctx, cc, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("compile remap library: %w\n%s", err, out)
+	}
+	data, err := os.ReadFile(tmp)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(lib, data, 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(hashPath(lib), []byte(sourceHash()+"\n"), 0o644); err != nil {
+		return "", err
+	}
+	if err := compileWrap(ctx, cc, dir); err != nil {
+		return "", err
+	}
+	return lib, nil
+}
+
+func wrapFresh() bool {
+	if runtime.GOOS != "linux" {
+		return true
+	}
+	st, err := os.Stat(WrapPath())
+	return err == nil && !st.IsDir() && st.Size() > 0
+}
+
+func compileWrap(ctx context.Context, cc, dir string) error {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	src := filepath.Join(dir, "wrap.c")
+	if err := os.WriteFile(src, []byte(wrapSrc), 0o644); err != nil {
+		return err
+	}
+	tmp := filepath.Join(dir, "lane-remap-wrap")
+	cmd := exec.CommandContext(ctx, cc, "-O2", "-o", tmp, src)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("compile remap wrapper: %w\n%s", err, out)
+	}
+	data, err := os.ReadFile(tmp)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(WrapPath(), data, 0o755)
+}
+
+func Available() bool {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		return false
+	}
+	if libFresh(LibPath()) {
+		return true
+	}
+	_, err := compiler()
+	return err == nil
+}

@@ -58,7 +58,7 @@ flowchart LR
 
   subgraph Lane ["lane CLI (Go 单二进制)"]
     Registry["~/.lane/state.json\n(全局端口块 / 锁 / GC)"]
-    Prim["隔离原语: listen 声明 / LANE_PORT_* 发布 / LANE_DATA_DIR / env / hooks"]
+    Prim["隔离原语: bind/connect 改写 / LANE_PORT_* 发布 / LANE_DATA_DIR / env / hooks"]
     GC["内建自动 GC"]
   end
 
@@ -85,7 +85,7 @@ flowchart LR
 ```yaml
 version: 1
 base: main
-isolate: net                                 # 每工作区一张网：进程仍听自己的端口，lane 发现并发布
+isolate: net                                 # 改写硬编码监听端口；进程仍在主机网络，可访问公网
 
 # 可选：给已发现的端口起名，供宿主侧 LANE_PORT_* / env 引用
 ports:
@@ -136,7 +136,7 @@ gc:
   max_workspaces: 8                          # 超过最大配额时淘汰最旧的干净工作区
 ```
 
-通用原语是 `isolate: net`（每工作区一张网），不是改项目去读 `PORT`。不写 `listen:` 时，lane 也会发现并发布正在监听的端口。`listen:` 只用来给宿主端口命名。进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`（不隔离）。Linux 用 user+net namespace 实现；macOS / Windows 没有等价的 Zero-VM 内核原语，同一硬编码端口不能并行。
+通用原语是 `isolate: net`：进程留在主机网络上（公网、Docker、DNS 都还能用），lane 只改写回环上的硬编码 `bind`/`connect`，映射到唯一宿主端口。不写 `listen:` 时也会发现并登记这些端口。`listen:` 只用来给宿主端口命名。进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`（不隔离）。Linux / macOS 用 libc preload（Linux 上 Go 另走 seccomp）；Windows 尚未实现。
 
 ---
 

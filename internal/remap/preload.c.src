@@ -1,0 +1,311 @@
+#define _GNU_SOURCE
+#include <arpa/inet.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/file.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#ifndef RTLD_NEXT
+#define RTLD_NEXT ((void *)-1l)
+#endif
+
+#define LANE_MIN 20000
+#define LANE_MAX 39999
+
+static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
+static int (*real_bind)(int, const struct sockaddr *, socklen_t);
+static int (*real_connect)(int, const struct sockaddr *, socklen_t);
+static int (*real_getsockname)(int, struct sockaddr *, socklen_t *);
+static int (*real_getpeername)(int, struct sockaddr *, socklen_t *);
+
+static void load_reals(void) {
+	if (real_bind)
+		return;
+	real_bind = (int (*)(int, const struct sockaddr *, socklen_t))dlsym(RTLD_NEXT, "bind");
+	real_connect = (int (*)(int, const struct sockaddr *, socklen_t))dlsym(RTLD_NEXT, "connect");
+	real_getsockname = (int (*)(int, struct sockaddr *, socklen_t *))dlsym(RTLD_NEXT, "getsockname");
+	real_getpeername = (int (*)(int, struct sockaddr *, socklen_t *))dlsym(RTLD_NEXT, "getpeername");
+}
+
+static const char *table_path(void) {
+	const char *p = getenv("LANE_REMAP_FILE");
+	if (p && p[0])
+		return p;
+	return NULL;
+}
+
+static int port_of(const struct sockaddr *sa) {
+	if (!sa)
+		return -1;
+	if (sa->sa_family == AF_INET)
+		return ntohs(((const struct sockaddr_in *)sa)->sin_port);
+	if (sa->sa_family == AF_INET6)
+		return ntohs(((const struct sockaddr_in6 *)sa)->sin6_port);
+	return -1;
+}
+
+static int is_loopback(const struct sockaddr *sa) {
+	if (!sa)
+		return 0;
+	if (sa->sa_family == AF_INET) {
+		uint32_t a = ntohl(((const struct sockaddr_in *)sa)->sin_addr.s_addr);
+		return (a >> 24) == 127;
+	}
+	if (sa->sa_family == AF_INET6) {
+		const struct in6_addr *a = &((const struct sockaddr_in6 *)sa)->sin6_addr;
+		static const unsigned char v4loop[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
+		if (IN6_IS_ADDR_LOOPBACK(a))
+			return 1;
+		if (memcmp(a->s6_addr, v4loop, 12) == 0 && a->s6_addr[12] == 127)
+			return 1;
+	}
+	return 0;
+}
+
+static void set_port(struct sockaddr *sa, int port) {
+	if (sa->sa_family == AF_INET)
+		((struct sockaddr_in *)sa)->sin_port = htons((uint16_t)port);
+	else if (sa->sa_family == AF_INET6)
+		((struct sockaddr_in6 *)sa)->sin6_port = htons((uint16_t)port);
+}
+
+static int probe_free(int port) {
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd < 0)
+		return 0;
+	int one = 1;
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+	struct sockaddr_in a;
+	memset(&a, 0, sizeof(a));
+	a.sin_family = AF_INET;
+	a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	a.sin_port = htons((uint16_t)port);
+	int rc = real_bind(fd, (struct sockaddr *)&a, sizeof(a));
+	close(fd);
+	return rc == 0;
+}
+
+static int lookup_locked(FILE *f, int listen) {
+	rewind(f);
+	char line[128];
+	int from, to;
+	while (fgets(line, sizeof(line), f)) {
+		if (sscanf(line, "%d=%d", &from, &to) == 2 && from == listen)
+			return to;
+	}
+	return 0;
+}
+
+static int reverse_locked(FILE *f, int host) {
+	rewind(f);
+	char line[128];
+	int from, to;
+	while (fgets(line, sizeof(line), f)) {
+		if (sscanf(line, "%d=%d", &from, &to) == 2 && to == host)
+			return from;
+	}
+	return 0;
+}
+
+static int reserved_locked(FILE *f, int port) {
+	rewind(f);
+	char line[128];
+	int p;
+	while (fgets(line, sizeof(line), f)) {
+		if (sscanf(line, "#reserved %d", &p) == 1 && p == port)
+			return 1;
+	}
+	return 0;
+}
+
+static int taken_host(FILE *f, int port) {
+	return reserved_locked(f, port) || reverse_locked(f, port) || lookup_locked(f, port);
+}
+
+static int alloc_locked(FILE *f, int listen) {
+	int existing = lookup_locked(f, listen);
+	if (existing)
+		return existing;
+	int start = LANE_MIN + (listen % 1000);
+	int p;
+	for (p = start; p <= LANE_MAX; p++) {
+		if (taken_host(f, p))
+			continue;
+		if (!probe_free(p))
+			continue;
+		fseek(f, 0, SEEK_END);
+		fprintf(f, "%d=%d\n", listen, p);
+		fflush(f);
+		return p;
+	}
+	for (p = LANE_MIN; p < start; p++) {
+		if (taken_host(f, p))
+			continue;
+		if (!probe_free(p))
+			continue;
+		fseek(f, 0, SEEK_END);
+		fprintf(f, "%d=%d\n", listen, p);
+		fflush(f);
+		return p;
+	}
+	return 0;
+}
+
+enum { MODE_ALLOC = 0, MODE_LOOKUP = 1, MODE_REVERSE = 2 };
+
+static int with_table(int key, int *out, int mode) {
+	const char *path = table_path();
+	if (!path)
+		return 0;
+	int fd = open(path, O_RDWR | O_CREAT, 0644);
+	if (fd < 0)
+		return 0;
+	if (flock(fd, LOCK_EX) != 0) {
+		close(fd);
+		return 0;
+	}
+	FILE *f = fdopen(fd, "r+");
+	if (!f) {
+		close(fd);
+		return 0;
+	}
+	int got = 0;
+	switch (mode) {
+	case MODE_REVERSE:
+		got = reverse_locked(f, key);
+		break;
+	case MODE_LOOKUP:
+		got = lookup_locked(f, key);
+		break;
+	default:
+		got = alloc_locked(f, key);
+		break;
+	}
+	if (out)
+		*out = got;
+	fclose(f);
+	return got != 0;
+}
+
+static int map_listen(int listen) {
+	if (listen <= 0 || (listen >= LANE_MIN && listen <= LANE_MAX))
+		return listen;
+	int host = 0;
+	pthread_mutex_lock(&mu);
+	if (!with_table(listen, &host, MODE_ALLOC))
+		host = 0;
+	pthread_mutex_unlock(&mu);
+	return host ? host : listen;
+}
+
+static int map_connect(int dest) {
+	if (dest <= 0)
+		return dest;
+	int host = 0;
+	pthread_mutex_lock(&mu);
+	if (!with_table(dest, &host, MODE_LOOKUP))
+		host = 0;
+	pthread_mutex_unlock(&mu);
+	return host ? host : dest;
+}
+
+static int unmap_host(int host) {
+	int listen = 0;
+	pthread_mutex_lock(&mu);
+	if (!with_table(host, &listen, MODE_REVERSE))
+		listen = 0;
+	pthread_mutex_unlock(&mu);
+	return listen ? listen : host;
+}
+
+static int lane_bind(int fd, const struct sockaddr *addr, socklen_t len) {
+	load_reals();
+	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6))
+		return real_bind(fd, addr, len);
+	int want = port_of(addr);
+	if (want <= 0 || (want >= LANE_MIN && want <= LANE_MAX))
+		return real_bind(fd, addr, len);
+	unsigned char buf[128];
+	if (len > sizeof(buf))
+		return real_bind(fd, addr, len);
+	memcpy(buf, addr, len);
+	int host = map_listen(want);
+	set_port((struct sockaddr *)buf, host);
+	return real_bind(fd, (struct sockaddr *)buf, len);
+}
+
+static int lane_connect(int fd, const struct sockaddr *addr, socklen_t len) {
+	load_reals();
+	if (!addr || !is_loopback(addr))
+		return real_connect(fd, addr, len);
+	int dest = port_of(addr);
+	if (dest <= 0)
+		return real_connect(fd, addr, len);
+	int host = map_connect(dest);
+	if (host == dest)
+		return real_connect(fd, addr, len);
+	unsigned char buf[128];
+	if (len > sizeof(buf))
+		return real_connect(fd, addr, len);
+	memcpy(buf, addr, len);
+	set_port((struct sockaddr *)buf, host);
+	return real_connect(fd, (struct sockaddr *)buf, len);
+}
+
+static int lane_getsockname(int fd, struct sockaddr *addr, socklen_t *len) {
+	load_reals();
+	int rc = real_getsockname(fd, addr, len);
+	if (rc != 0 || !addr)
+		return rc;
+	int host = port_of(addr);
+	int listen = unmap_host(host);
+	if (listen != host)
+		set_port(addr, listen);
+	return rc;
+}
+
+static int lane_getpeername(int fd, struct sockaddr *addr, socklen_t *len) {
+	load_reals();
+	int rc = real_getpeername(fd, addr, len);
+	if (rc != 0 || !addr)
+		return rc;
+	int host = port_of(addr);
+	int listen = unmap_host(host);
+	if (listen != host)
+		set_port(addr, listen);
+	return rc;
+}
+
+#ifndef __APPLE__
+int bind(int fd, const struct sockaddr *addr, socklen_t len) {
+	return lane_bind(fd, addr, len);
+}
+int connect(int fd, const struct sockaddr *addr, socklen_t len) {
+	return lane_connect(fd, addr, len);
+}
+int getsockname(int fd, struct sockaddr *addr, socklen_t *len) {
+	return lane_getsockname(fd, addr, len);
+}
+int getpeername(int fd, struct sockaddr *addr, socklen_t *len) {
+	return lane_getpeername(fd, addr, len);
+}
+#else
+#define DYLD_INTERPOSE(_repl, _orig) \
+	__attribute__((used)) static struct { \
+		const void *repl; \
+		const void *orig; \
+	} _interpose_##_orig __attribute__((section("__DATA,__interpose"))) = { \
+		(const void *)(unsigned long)&_repl, (const void *)(unsigned long)&_orig};
+DYLD_INTERPOSE(lane_bind, bind)
+DYLD_INTERPOSE(lane_connect, connect)
+DYLD_INTERPOSE(lane_getsockname, getsockname)
+DYLD_INTERPOSE(lane_getpeername, getpeername)
+#endif

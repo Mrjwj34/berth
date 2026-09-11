@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/netns"
+	"github.com/Mrjwj34/lane/internal/remap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,10 +44,11 @@ func LogFile(worktree string) string {
 }
 func PortFile(worktree string) string { return filepath.Join(config.LaneDir(worktree), "pc.port") }
 
-func Render(worktree string, processes map[string]any, env map[string]string) error {
+func Render(worktree string, processes map[string]any, env map[string]string, maps []remap.Mapping) error {
 	if len(processes) == 0 {
 		return nil
 	}
+	processes = remap.RewriteProbes(processes, maps)
 	expanded := expandAny(processes, env)
 	procs, ok := expanded.(map[string]any)
 	if !ok {
@@ -108,42 +109,53 @@ func expandAny(v any, env map[string]string) any {
 	}
 }
 
-func Up(ctx context.Context, worktree string, env map[string]string, pcPort int, maps []netns.Mapping, isolate bool) error {
+func Up(ctx context.Context, worktree string, env map[string]string, pcPort int, maps []remap.Mapping, isolate bool) error {
 	if _, err := os.Stat(PCFile(worktree)); err != nil {
 		return fmt.Errorf("no generated process file at %s. Add a processes: section to lane.yaml", PCFile(worktree))
 	}
 	if Running(ctx, worktree) {
 		return nil
 	}
-	_ = netns.Stop(worktree)
+	_ = remap.Stop(worktree)
+	if isolate {
+		if err := remap.Setup(ctx, worktree, maps, reservedHosts(maps)); err != nil {
+			return err
+		}
+		env = remap.ApplyMap(env, worktree)
+		if err := injectProcessEnv(PCFile(worktree), remap.EnvVars(worktree)); err != nil {
+			return err
+		}
+	}
 	bin, err := Ensure(ctx)
 	if err != nil {
 		return err
 	}
+	supervise := isolate && remap.ShouldSupervise()
 	args := []string{
-		"up", "-t=false",
+		"up", "-D", "-t=false",
 		"-f", PCFile(worktree),
 		"--disable-dotenv",
 		"-L", LogFile(worktree),
 	}
-	if !isolate {
+	if supervise {
 		args = []string{
-			"up", "-D", "-t=false",
+			"up", "-t=false",
 			"-f", PCFile(worktree),
 			"--disable-dotenv",
 			"-L", LogFile(worktree),
 		}
 	}
 	args = append(args, clientArgs(worktree, pcPort)...)
-	if isolate {
-		if err := netns.Start(ctx, worktree, maps, true, bin, args, config.Environ(os.Environ(), env)); err != nil {
+	fullEnv := config.Environ(os.Environ(), env)
+	if supervise {
+		if err := remap.Spawn(ctx, worktree, bin, args, fullEnv); err != nil {
 			return err
 		}
 		return waitReady(ctx, worktree, 60*time.Second)
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = worktree
-	cmd.Env = config.Environ(os.Environ(), env)
+	cmd.Env = fullEnv
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
@@ -174,10 +186,71 @@ func Down(ctx context.Context, worktree string) error {
 	}
 	_ = os.Remove(Socket(worktree))
 	_ = os.Remove(PortFile(worktree))
-	if err := netns.Stop(worktree); err != nil && downErr == nil {
+	if err := remap.Stop(worktree); err != nil && downErr == nil {
 		return err
 	}
 	return downErr
+}
+
+func reservedHosts(maps []remap.Mapping) []int {
+	out := make([]int, 0, len(maps))
+	for _, m := range maps {
+		if m.Host > 0 {
+			out = append(out, m.Host)
+		}
+	}
+	return out
+}
+
+func injectProcessEnv(path string, extra map[string]string) error {
+	if len(extra) == 0 {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	procs, _ := doc["processes"].(map[string]any)
+	if len(procs) == 0 {
+		return nil
+	}
+	for name, raw := range procs {
+		proc, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		existing, _ := proc["environment"].([]any)
+		have := map[string]int{}
+		for i, item := range existing {
+			s, ok := item.(string)
+			if !ok {
+				continue
+			}
+			k, _, ok := strings.Cut(s, "=")
+			if ok {
+				have[k] = i
+			}
+		}
+		for k, v := range extra {
+			entry := k + "=" + v
+			if i, ok := have[k]; ok {
+				existing[i] = entry
+				continue
+			}
+			existing = append(existing, entry)
+		}
+		proc["environment"] = existing
+		procs[name] = proc
+	}
+	out, err := yaml.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, out, 0o644)
 }
 
 func Status(ctx context.Context, worktree string) ([]Proc, error) {

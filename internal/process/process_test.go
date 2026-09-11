@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/netns"
+	"github.com/Mrjwj34/lane/internal/remap"
 )
 
 func TestRenderExpandsAndInjectsEnv(t *testing.T) {
@@ -32,7 +32,7 @@ func TestRenderExpandsAndInjectsEnv(t *testing.T) {
 		},
 	}
 	env := map[string]string{"LANE_PORT_WEB": "20123", "LANE_WORKSPACE": dir}
-	if err := Render(dir, procs, env); err != nil {
+	if err := Render(dir, procs, env, nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(PCFile(dir))
@@ -80,7 +80,7 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 			"command": "python3 -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
 		},
 	}
-	if err := Render(dir, procs, env); err != nil {
+	if err := Render(dir, procs, env, nil); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
@@ -104,8 +104,11 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 }
 
 func TestUpHardcodedListenPublished(t *testing.T) {
-	if runtime.GOOS != "linux" || !netns.Available() {
-		t.Skip("listen remap needs Linux user+net namespaces")
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("listen remap needs linux or darwin")
+	}
+	if !remap.Available() {
+		t.Skip("C compiler not available to build remap library")
 	}
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not available")
@@ -115,6 +118,7 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 			t.Skip(err)
 		}
 	}
+	t.Setenv("LANE_HOME", t.TempDir())
 	dir := t.TempDir()
 	if err := os.MkdirAll(config.LaneDir(dir), 0o755); err != nil {
 		t.Fatal(err)
@@ -136,11 +140,11 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 			"command": "python3 -m http.server 18082 --bind 127.0.0.1",
 		},
 	}
-	if err := Render(dir, procs, env); err != nil {
+	if err := Render(dir, procs, env, nil); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	maps := []netns.Mapping{{Name: "api", Host: host, Listen: listen}}
+	maps := []remap.Mapping{{Name: "api", Host: host, Listen: listen}}
 	if err := Up(ctx, dir, env, 0, maps, true); err != nil {
 		t.Fatal(err)
 	}

@@ -7,9 +7,9 @@ const Template = `# lane.yaml — isolation primitives only. lane does not know 
 version: 1
 base: main                                   # baseline branch; created branches use prefix lane/
 
-# General isolation: each workspace gets a private network. Processes keep
-# their own listen ports; lane discovers them and publishes unique host ports.
-# isolate: net
+# General isolation: processes stay on the host network (public internet
+# still works). bind/connect on hardcoded listen ports are rewritten to a
+# unique host port. isolate: net
 #
 # Optional names for those host ports (LANE_PORT_API). listen: is a hint, not
 # a requirement — omit it and lane still publishes whatever is listening.

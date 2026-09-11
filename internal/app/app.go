@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,8 +16,8 @@ import (
 	"github.com/Mrjwj34/lane/internal/gc"
 	"github.com/Mrjwj34/lane/internal/gitx"
 	"github.com/Mrjwj34/lane/internal/home"
-	"github.com/Mrjwj34/lane/internal/netns"
 	"github.com/Mrjwj34/lane/internal/process"
+	"github.com/Mrjwj34/lane/internal/remap"
 	"github.com/Mrjwj34/lane/internal/skill"
 	"github.com/Mrjwj34/lane/internal/state"
 	"github.com/Mrjwj34/lane/internal/worktree"
@@ -309,14 +308,21 @@ func (a *App) Up(ctx context.Context, pathOrSlug string) error {
 		return fmt.Errorf("no processes declared in lane.yaml. Add a processes: section or skip lane up")
 	}
 	env := workspaceEnv(cfg, ws)
-	if err := process.Render(ws.Path, cfg.Processes, env); err != nil {
+	maps, isolate := process.IsolatePlan(cfg, ws.Ports)
+	if isolate {
+		reserved := usedPortList(ctx, a)
+		if err := remap.Setup(ctx, ws.Path, maps, reserved); err != nil {
+			return err
+		}
+		env = remap.ApplyMap(env, ws.Path)
+	}
+	if err := process.Render(ws.Path, cfg.Processes, env, maps); err != nil {
 		return err
 	}
 	if err := a.writeEnv(cfg, ws); err != nil {
 		return err
 	}
 	_ = a.touch(ctx, ws.Path)
-	maps, isolate := process.IsolatePlan(cfg, ws.Ports)
 	if err := process.Up(ctx, ws.Path, env, ws.Ports["pc"], maps, isolate); err != nil {
 		return err
 	}
@@ -370,14 +376,13 @@ func (a *App) Run(ctx context.Context, slug string, argv []string) error {
 		return err
 	}
 	env := workspaceEnv(cfg, ws)
-	merged := config.Environ(os.Environ(), env)
-	_ = a.touch(ctx, ws.Path)
-	if netns.InsidePID(ws.Path) > 0 {
-		err := netns.Exec(ctx, ws.Path, argv, merged)
-		if err == nil || (!errors.Is(err, netns.ErrNoNsenter) && !errors.Is(err, netns.ErrNotRunning)) {
-			return err
+	if cfg.IsolateNet() {
+		if _, err := remap.EnsureLib(ctx); err == nil {
+			env = remap.ApplyMap(env, ws.Path)
 		}
 	}
+	merged := config.Environ(os.Environ(), env)
+	_ = a.touch(ctx, ws.Path)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = ws.Path
 	cmd.Env = merged
@@ -511,15 +516,19 @@ func (a *App) Doctor(ctx context.Context, fix bool) (*DoctorReport, error) {
 	}
 	rep.Checks = append(rep.Checks, st)
 
-	ns := DoctorCheck{Name: "netns", OK: true}
-	if runtime.GOOS != "linux" {
-		ns.Detail = "listen: remaps require Linux network namespaces"
-	} else if !netns.Available() {
-		ns.Detail = "unprivileged user+net namespaces are disabled; ports.*.listen remaps are unavailable. Enable kernel.unprivileged_userns_clone=1"
-	} else {
-		ns.Detail = "user+net namespace available (ports.*.listen remaps)"
+	rm := DoctorCheck{Name: "remap", OK: true}
+	switch runtime.GOOS {
+	case "linux", "darwin":
+		if remap.Available() {
+			rm.Detail = "bind/connect remap on the host network (libc preload; Linux Go uses seccomp)"
+		} else {
+			rm.OK = false
+			rm.Detail = "no C compiler and no cached remap library. Install cc so isolate: net can rewrite hardcoded listen ports"
+		}
+	default:
+		rm.Detail = "isolate: net bind remap is not implemented on " + runtime.GOOS
 	}
-	rep.Checks = append(rep.Checks, ns)
+	rep.Checks = append(rep.Checks, rm)
 
 	if fix {
 		if _, err := a.GC(ctx, false); err != nil {

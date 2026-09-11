@@ -54,8 +54,8 @@ func (p Ports) NeedsIsolate() bool {
 	return false
 }
 
-// IsolateNet is the general workspace-network primitive: processes keep
-// their own listen ports; lane publishes unique host ports.
+// IsolateNet remaps hardcoded listen ports on the host network so parallel
+// workspaces can bind the same port without losing public internet access.
 func (c *Config) IsolateNet() bool {
 	if c == nil {
 		return false

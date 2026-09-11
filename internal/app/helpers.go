@@ -16,9 +16,9 @@ import (
 
 	"github.com/Mrjwj34/lane/internal/config"
 	"github.com/Mrjwj34/lane/internal/gitx"
-	"github.com/Mrjwj34/lane/internal/netns"
 	"github.com/Mrjwj34/lane/internal/ports"
 	"github.com/Mrjwj34/lane/internal/process"
+	"github.com/Mrjwj34/lane/internal/remap"
 	"github.com/Mrjwj34/lane/internal/skill"
 	"github.com/Mrjwj34/lane/internal/state"
 	"github.com/Mrjwj34/lane/internal/worktree"
@@ -130,35 +130,42 @@ func (a *App) writeEnv(cfg *config.Config, ws state.Workspace) error {
 	return config.WriteEnvFile(path, env)
 }
 
+func usedPortList(ctx context.Context, a *App) []int {
+	file, err := a.Store.Read(ctx)
+	if err != nil {
+		return nil
+	}
+	out := make([]int, 0, len(file.UsedPorts()))
+	for p := range file.UsedPorts() {
+		out = append(out, p)
+	}
+	return out
+}
+
 func (a *App) publishDiscovered(ctx context.Context, cfg *config.Config, ws state.Workspace) error {
-	known := map[int]struct{}{}
+	named := map[int]struct{}{}
 	for _, p := range cfg.Ports {
 		if p.Listen > 0 {
-			known[p.Listen] = struct{}{}
-			continue
-		}
-		if host := ws.Ports[p.Name]; host > 0 {
-			known[host] = struct{}{}
+			named[p.Listen] = struct{}{}
 		}
 	}
 	for name := range ws.Ports {
 		if n, err := strconv.Atoi(name); err == nil {
-			known[n] = struct{}{}
+			named[n] = struct{}{}
 		}
 	}
 	deadline := time.Now().Add(3 * time.Second)
-	var extra []int
+	var extra []remap.Mapping
 	for {
-		found, err := netns.Discover(ws.Path)
-		if err != nil {
-			return err
-		}
 		extra = extra[:0]
-		for _, lp := range found {
-			if _, ok := known[lp]; ok {
+		for _, m := range remap.Mappings(ws.Path) {
+			if m.Listen <= 0 || m.Host <= 0 {
 				continue
 			}
-			extra = append(extra, lp)
+			if _, ok := named[m.Listen]; ok {
+				continue
+			}
+			extra = append(extra, m)
 		}
 		if len(extra) > 0 || time.Now().After(deadline) {
 			break
@@ -172,15 +179,7 @@ func (a *App) publishDiscovered(ctx context.Context, cfg *config.Config, ws stat
 	if len(extra) == 0 {
 		return nil
 	}
-	names := make([]string, len(extra))
-	for i, lp := range extra {
-		names[i] = strconv.Itoa(lp)
-	}
-	allocated, err := a.allocate(ctx, names)
-	if err != nil {
-		return err
-	}
-	if err := a.Store.Update(ctx, func(f *state.File) error {
+	return a.Store.Update(ctx, func(f *state.File) error {
 		cur, ok := f.Workspaces[ws.Path]
 		if !ok {
 			return nil
@@ -188,21 +187,12 @@ func (a *App) publishDiscovered(ctx context.Context, cfg *config.Config, ws stat
 		if cur.Ports == nil {
 			cur.Ports = map[string]int{}
 		}
-		for name, host := range allocated {
-			cur.Ports[name] = host
+		for _, m := range extra {
+			cur.Ports[strconv.Itoa(m.Listen)] = m.Host
 		}
 		f.Workspaces[ws.Path] = cur
 		return nil
-	}); err != nil {
-		return err
-	}
-	for _, lp := range extra {
-		name := strconv.Itoa(lp)
-		if err := netns.Publish(ws.Path, netns.Mapping{Name: name, Host: allocated[name], Listen: lp}); err != nil {
-			return err
-		}
-	}
-	return nil
+	})
 }
 
 func mergeListen(declared map[string]int, ports map[string]int) map[string]int {
