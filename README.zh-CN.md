@@ -6,13 +6,19 @@
   <a href="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml"><img src="https://github.com/Mrjwj34/lane/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/Mrjwj34/lane/releases"><img src="https://img.shields.io/github/v/release/Mrjwj34/lane" alt="Latest Release" /></a>
   <a href="https://golang.org"><img src="https://img.shields.io/github/go-mod/go-version/Mrjwj34/lane" alt="Go Version" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="License" /></a>
-  <br><br>
-  简体中文 | <a href="README.md">English</a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Mrjwj34/lane" alt="开源许可" /></a>
 </p>
 <br clear="left" />
 
+<p align="center">
+  <a href="README.md">English</a> | 简体中文
+</p>
+
 lane 为多个 Agent 并行编程快速拉起轻量、隔离的本地工作区，将 Git worktree、私有数据目录、动态端口分配以及受管进程融为一体，无需承担虚拟机的庞大开销。
+
+<p align="center">
+  <img src="docs/demo.gif" alt="lane 演示" width="760" />
+</p>
 
 ## 安装
 
