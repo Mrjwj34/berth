@@ -17,7 +17,7 @@
 lane 为多个 Agent 并行编程快速拉起轻量、隔离的本地工作区，将 Git worktree、私有数据目录、动态端口分配以及受管进程融为一体，无需承担虚拟机的庞大开销。
 
 <p align="center">
-  <img src="docs/demo.gif" alt="lane 演示" width="760" />
+  <img src="https://cdn.jwjbox.dev/berth-demo.gif" alt="berth 演示" width="760" />
 </p>
 
 ## 安装

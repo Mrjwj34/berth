@@ -17,7 +17,7 @@
 lane provisions lightweight, isolated local workspaces for parallel agent programming, combining Git worktrees, private data directories, dynamic port assignment, and supervised processes without virtual machine overhead.
 
 <p align="center">
-  <img src="docs/demo.gif" alt="lane demo" width="760" />
+  <img src="https://cdn.jwjbox.dev/berth-demo.gif" alt="berth demo" width="760" />
 </p>
 
 ## Install
