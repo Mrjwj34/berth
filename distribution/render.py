@@ -283,7 +283,7 @@ def main() -> None:
 
     for path, content in targets.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        path.write_text(content, encoding="utf-8", newline="\n")
         print(f"wrote {path}")
 
     print(f"\nHomebrew: brew install {TAP}/berth")
