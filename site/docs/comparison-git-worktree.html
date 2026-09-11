@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>berth vs raw git worktree — berth documentation</title>
+<meta name="description" content="A design-axis comparison of berth and raw git worktree — isolation, ports, private data, supervision and safe removal — and when the plain command is the better answer.">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/docs/comparison-git-worktree.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="berth vs raw git worktree — berth documentation">
+<meta property="og:description" content="What a linked worktree already solves, the four things Git leaves to you, what berth adds on top, and when the plain git worktree command is the better answer.">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/docs/comparison-git-worktree.html">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth architecture diagram">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./getting-started.html">Docs</a>
+      <a class="nav-docs" href="./features.html">Features</a>
+      <a class="nav-docs" href="./runtime.html">Runtime</a>
+      <a class="nav-docs" href="./architecture.html">Architecture</a>
+      <a class="nav-docs" href="./comparison-devcontainer.html">Compare</a>
+      <a class="nav-lang" href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <nav class="subnav" aria-label="Documentation">
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./features.html">Features &amp; configuration</a>
+      <a href="./runtime.html">Runtime contract</a>
+      <a href="./architecture.html">Architecture</a>
+      <a href="./comparison-git-worktree.html" aria-current="page">vs git worktree</a>
+      <a href="./comparison-devcontainer.html">vs devcontainer</a>
+      <a href="./comparison-agents.html">vs agent tools</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <p class="crumbs"><a href="../index.html">berth</a> / Documentation / berth vs raw git worktree</p>
+      <h1>berth vs raw git worktree</h1>
+      <p>A linked Git worktree is the substrate berth is built on, not a competitor to it. This page separates what <code>git worktree</code> already solves from the four things it deliberately leaves to you, then says plainly where the raw command is the better answer.</p>
+    </header>
+
+    <article class="prose">
+      <p>Git worktrees solve the part of parallel work that is hardest to solve any other way: two working directories, two branches, one object store, one command, no daemon, nothing resident afterwards. berth does not replace that — <code>berth new</code> runs it. The difference is everything a checkout needs in order to <em>run</em>: a port set, private data and a process graph. Git leaves those to you on purpose, and berth is the layer that stops leaving them to you.</p>
+
+      <h2 id="axes">The axes</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <caption>Design-axis comparison. Each row describes what the two approaches do at that axis; the sections below expand the ones that decide the outcome.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Design axis</th>
+              <th scope="col" class="col-accent">berth</th>
+              <th scope="col">raw <code>git worktree</code></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Isolation boundary</th>
+              <td class="col-accent" data-label="berth">The workspace: a linked worktree, a private data directory, a reserved port set and one supervised process graph</td>
+              <td data-label="raw git worktree">Files and branches. Ports, data and processes stay on the host, shared with every other checkout</td>
+            </tr>
+            <tr>
+              <th scope="row">Startup cost</th>
+              <td class="col-accent" data-label="berth">One <code>git worktree add</code> plus a short registry transaction behind a file lock — no daemon, and nothing left running</td>
+              <td data-label="raw git worktree">One <code>git worktree add</code>. Nothing else is set up, because nothing else is managed</td>
+            </tr>
+            <tr>
+              <th scope="row">Port allocation</th>
+              <td class="col-accent" data-label="berth">Named ports reserved in one cross-process transaction with the workspace record, stable for its lifetime: <code>BERTH_PORT_&lt;NAME&gt;</code> in-context, <code>BERTH_HOST_PORT_&lt;NAME&gt;</code> on host <code>127.0.0.1</code></td>
+              <td data-label="raw git worktree">Manual. The number lands in a local config file or a shell override, which is exactly where it gets committed by mistake</td>
+            </tr>
+            <tr>
+              <th scope="row">Data isolation</th>
+              <td class="col-accent" data-label="berth"><code>$BERTH_DATA_DIR</code> (<code>&lt;workspace&gt;/.berth/data</code>) for databases, caches and sockets; <code>copy_dirs</code> and <code>.worktreeinclude</code> seed dependency trees and local files during setup</td>
+              <td data-label="raw git worktree">None. Gitignored state — <code>.env</code>, a local database directory, caches — is shared with every checkout or copied by hand</td>
+            </tr>
+            <tr>
+              <th scope="row">Process supervision</th>
+              <td class="col-accent" data-label="berth">A declared process graph supervised by process-compose natively, with readiness probes and <code>up</code>/<code>down</code>/<code>status</code>/<code>logs</code> per workspace</td>
+              <td data-label="raw git worktree">None. Background shells and remembered PIDs; a server that outlives its terminal still holds its port</td>
+            </tr>
+            <tr>
+              <th scope="row">Per-workspace configuration</th>
+              <td class="col-accent" data-label="berth">Each workspace reads <code>berth.yaml</code> from its own branch, so processes, hooks and env are branch-local; the runtime and port contract is immutable once created</td>
+              <td data-label="raw git worktree">Branch-local for tracked files only. Ignored files and environment are whatever the host and the primary checkout happen to have</td>
+            </tr>
+            <tr>
+              <th scope="row">Host filesystem speed</th>
+              <td class="col-accent" data-label="berth">Native mode runs host processes on the host filesystem; <code>copy_dirs</code> uses copy-on-write where the filesystem supports it and an independent copy elsewhere</td>
+              <td data-label="raw git worktree">Host speed by definition: the checkout is an ordinary directory</td>
+            </tr>
+            <tr>
+              <th scope="row">Safe removal</th>
+              <td class="col-accent" data-label="berth"><code>berth done</code> requires the commit preserved and the worktree clean, then removes the checkout and its registration; branch deletion uses Git's atomic old-value check, and <code>berth gc</code> never forces</td>
+              <td data-label="raw git worktree"><code>git worktree remove</code> plus <code>git branch -d</code>: two commands, and the judgement about whether the work is preserved is yours</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="what-worktrees-solve">What a linked worktree genuinely solves</h2>
+      <p>Git already provides the hard part. <code>git worktree add ../my-repo.berths/feature-a -b berth/feature-a</code> gives you a second working directory with its own index and <code>HEAD</code>, backed by the same object store as the primary checkout. No clone, no second fetch, no duplicated history, no service to keep running, and nothing to install. <code>git worktree list</code> is a truthful inventory of what is checked out on the machine, and creating one is cheap enough to do per task rather than per week.</p>
+      <p>That is precisely why berth uses it instead of inventing something else. <code>berth new</code> creates a linked worktree on branch <code>berth/&lt;slug&gt;</code>, beside the repository at <code>&lt;repo&gt;.berths/&lt;slug&gt;</code> (or under <code>worktree_root</code> when you configure one). <code>berth adopt</code> exists for the mirror case: a linked worktree created by something else is already most of a workspace, and adopting it registers the checkout without recreating it. If your entire problem is "two branches, one repository, two editors", Git solved it and does not need help.</p>
+
+      <h2 id="what-git-leaves">The four things a worktree leaves to you</h2>
+
+      <h3>A port for every checkout</h3>
+      <p>Worktrees isolate files; they do not isolate a TCP port. The primary checkout says <code>PORT=3000</code> in a gitignored <code>.env</code>, the new worktree needs another number, and the next task needs a third. The usual workaround is a per-checkout environment file or a command-line override — and an override written into a tracked file is a commit waiting to happen. That is the specific trap: dynamic local state turns into a repository diff, and then into a merge conflict about a port number. berth answers it with a named port set declared in <code>berth.yaml</code>, reserved atomically with the workspace record in one cross-process transaction and stable for the lifetime of the workspace. Programs read <code>BERTH_PORT_&lt;NAME&gt;</code> for the port inside their execution context and <code>BERTH_HOST_PORT_&lt;NAME&gt;</code> for the host publication on <code>127.0.0.1</code>.</p>
+
+      <h3>Ignored state: <code>.env</code>, local databases, caches</h3>
+      <p>Git protects what it tracks, and most projects deliberately do not track <code>.env</code>, the local database directory, caches or generated fixtures. Every worktree that skips them therefore reads and writes the same bytes as every other checkout. Two migration runs against one data directory is not a merge conflict you can resolve; it is corrupted local state, and the symptom usually appears somewhere far away from the cause. berth gives each workspace <code>$BERTH_DATA_DIR</code> for mutable state, copies writable dependency trees through <code>copy_dirs</code>, and copies individual repository-relative files such as <code>.env</code> through a <code>.worktreeinclude</code> path list.</p>
+
+      <h3>Process lifecycle</h3>
+      <p>A checkout contains no scheduler. The dev server you started in a background shell keeps holding its port after the terminal that started it is gone, and identifying it later means reading <code>netstat</code> output and guessing which of the results is yours. berth keeps a declared process graph per workspace, supervised by process-compose in native mode or by the container engine in container mode. Readiness probes make <code>berth up</code> wait for <code>ready</code> instead of a sleep loop, <code>berth status --json</code> reports what is actually running, <code>berth logs &lt;proc&gt;</code> shows why something is not, and <code>berth down</code> stops the graph without touching data.</p>
+
+      <h3>Ownership, and removal that is safe to run</h3>
+      <p>Six worktrees in, the question is no longer only "which branch is this" but "may I delete it". With raw Git that is two decisions made from memory: is this checkout still needed, and is its branch safe to delete? berth stores a workspace record, so the answer is a lookup rather than a recollection. <code>berth done</code> requires the branch commit to be preserved — merged or present upstream — and the worktree to be clean, then tears down the runtime and removes the checkout and its registration. Branch deletion uses Git's atomic old-value check against the recorded commit, <code>--force</code> cannot bypass ownership, identity, primary-worktree or shutdown checks, and an adopted checkout is never removed. <code>berth gc</code> selects candidates and never forces.</p>
+
+      <h2 id="what-berth-adds">What berth adds on top of Git</h2>
+      <p>Read together, the four sections above are additive, not a rewrite of Git. berth keeps the worktree and wraps it in a workspace record: the record carries the ports, the data directory, the runtime choice and the process graph, and it is what makes the rest of the lifecycle answerable without memory. The raw Git path and the berth path differ less in what gets checked out than in what happens next.</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="git worktree add ../my-repo.berths/feature-a -b berth/feature-a
+cd ../my-repo.berths/feature-a
+# now: pick a free port, write a local .env, start the services, remember the PIDs" aria-label="Copy the raw worktree baseline">Copy</button>
+        <pre><code>git worktree add ../my-repo.berths/feature-a -b berth/feature-a
+cd ../my-repo.berths/feature-a
+# now: pick a free port, write a local .env, start the services, remember the PIDs</code></pre>
+      </div>
+      <p>The same task through berth keeps the first line and replaces the other three with managed ones:</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="berth new feature-a --up        # linked worktree, reserved ports, supervised processes
+cd ../my-repo.berths/feature-a
+berth run -- npm test
+berth status --json             # readiness instead of sleep loops
+berth done feature-a            # refuses until the commit is preserved and the tree is clean" aria-label="Copy the berth equivalents">Copy</button>
+        <pre><code>berth new feature-a --up        # linked worktree, reserved ports, supervised processes
+cd ../my-repo.berths/feature-a
+berth run -- npm test
+berth status --json             # readiness instead of sleep loops
+berth done feature-a            # refuses until the commit is preserved and the tree is clean</code></pre>
+      </div>
+
+      <div class="note">
+        <p><strong>Commit <code>berth.yaml</code> before creating the workspace.</strong> Each workspace loads its configuration from its own branch, so uncommitted edits never reach a workspace created from them — and a workspace created from an old commit will not see the ports and processes you just added.</p>
+      </div>
+
+      <div class="note">
+        <p><strong>Do not clean up a workspace by hand.</strong> <code>rm -rf</code>, <code>git worktree remove</code> and guessed PID or port cleanup corrupt the registry instead of releasing a workspace. Use <code>berth down</code> to stop it, <code>berth done</code> to release it, and <code>berth gc</code> to reclaim what was abandoned.</p>
+      </div>
+
+      <h2 id="when-raw-wins">When raw <code>git worktree</code> is the right answer</h2>
+      <p>Often. A worktree is the correct tool when you want to read another branch while keeping your working tree untouched, when the task is short and single-purpose and you will merge it in one sitting, and when the project genuinely has no services, no database and no listening ports — a documentation repository, a library, a small CLI. It is also the right answer when you cannot or will not install another binary on the machine, when adding a tool to the repository requires review you do not want to spend, or when you want the smallest possible mental model: worktrees have no registry to understand and no state to reconcile.</p>
+      <p>berth costs you a committed <code>berth.yaml</code>, a workspace record and a lifecycle to learn. It earns that back only if at least one of the four sections above is a real problem for you. For a repository whose main resource contention is a shared port and a shared database directory, that is usually the case; for one where two checkouts rarely run at the same time, it usually is not, and using worktrees directly is the honest recommendation.</p>
+
+      <nav class="page-nav" aria-label="Documentation pagination">
+        <a class="btn btn-ghost" href="./comparison-devcontainer.html">berth vs devcontainer / Docker →</a>
+        <a class="btn btn-ghost" href="./comparison-agents.html">berth vs parallel-agent tooling →</a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>Fast, low-cost management of parallel development environments. One workspace per task: worktree, data, ports and processes.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          <li><a href="./getting-started.html">Getting started</a></li>
+          <li><a href="./features.html">Features &amp; configuration</a></li>
+          <li><a href="./runtime.html">Runtime contract</a></li>
+          <li><a href="./architecture.html">Architecture</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Comparisons</h2>
+        <ul>
+          <li><a href="./comparison-git-worktree.html">vs raw git worktree</a></li>
+          <li><a href="./comparison-devcontainer.html">vs devcontainer / Docker</a></li>
+          <li><a href="./comparison-agents.html">vs orchestration tools</a></li>
+          <li><a href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文文档</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub repository</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">Releases</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">Issues</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT licensed · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth is a local workspace manager, not a security sandbox.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* copy stays manual */ }
+    document.body.removeChild(area);
+  }
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+})();
+</script>
+</body>
+</html>

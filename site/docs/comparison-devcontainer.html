@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>berth vs devcontainer / Docker — berth documentation</title>
+<meta name="description" content="Where an OS-level boundary is the right boundary, what a devcontainer or Docker environment costs, and what berth's container backend does differently.">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/docs/comparison-devcontainer.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="berth vs devcontainer / Docker — berth documentation">
+<meta property="og:description" content="Where an operating-system boundary is the right boundary, what it costs, and what berth's container backend does differently. Includes what berth is not: an adversarial security sandbox.">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/docs/comparison-devcontainer.html">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth architecture diagram">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./getting-started.html">Docs</a>
+      <a class="nav-docs" href="./features.html">Features</a>
+      <a class="nav-docs" href="./runtime.html">Runtime</a>
+      <a class="nav-docs" href="./architecture.html">Architecture</a>
+      <a class="nav-docs" href="./comparison-devcontainer.html">Compare</a>
+      <a class="nav-lang" href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <nav class="subnav" aria-label="Documentation">
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./features.html">Features &amp; configuration</a>
+      <a href="./runtime.html">Runtime contract</a>
+      <a href="./architecture.html">Architecture</a>
+      <a href="./comparison-git-worktree.html">vs git worktree</a>
+      <a href="./comparison-devcontainer.html" aria-current="page">vs devcontainer</a>
+      <a href="./comparison-agents.html">vs agent tools</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <p class="crumbs"><a href="../index.html">berth</a> / Documentation / berth vs devcontainer / Docker</p>
+      <h1>berth vs devcontainer / Docker</h1>
+      <p>These two approaches draw the isolation boundary in different places. A devcontainer or a plain container isolates the machine; berth isolates the workspace, and only uses a container when the workspace genuinely needs Linux. This page states what each boundary buys, what it costs, and where berth is simply the wrong tool.</p>
+    </header>
+
+    <article class="prose">
+      <p>The honest summary comes first: if your requirement is operating-system isolation — a uniform Linux environment, a toolchain your host cannot provide, an environment you also run in CI, or code you do not fully trust — a devcontainer or a plain container is the right tool, and berth is not a replacement for it. Everything below explains why the two are still worth comparing, because berth has a container backend of its own and it does not behave like a devcontainer setup.</p>
+
+      <h2 id="axes">The axes</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <caption>Design-axis comparison. Both columns describe design intent, not implementation: berth's statements come from its own documentation, and the container column describes the model rather than any particular tool.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Design axis</th>
+              <th scope="col" class="col-accent">berth</th>
+              <th scope="col">devcontainer / Docker</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Isolation boundary</th>
+              <td class="col-accent" data-label="berth">The workspace: linked worktree, private data directory, reserved ports, one process graph. Native mode shares the host kernel, filesystem and credentials</td>
+              <td data-label="devcontainer / Docker">The operating system: its own filesystem, users, network namespace and installed toolchain per project or session</td>
+            </tr>
+            <tr>
+              <th scope="row">Startup cost</th>
+              <td class="col-accent" data-label="berth">A worktree plus a short registry transaction; container mode reuses one prepared image per workspace and builds nothing per command</td>
+              <td data-label="devcontainer / Docker">Image build or pull, container create, mount setup, then start — repeated whenever the definition changes</td>
+            </tr>
+            <tr>
+              <th scope="row">Build and image model</th>
+              <td class="col-accent" data-label="berth">The image is an input, not a build step: one prepared Linux image per workspace, never built per command, never pulled implicitly, never silently replaced by running on the host</td>
+              <td data-label="devcontainer / Docker">The image <em>is</em> the environment: a definition you build, version and invalidate deliberately</td>
+            </tr>
+            <tr>
+              <th scope="row">Port allocation and publication</th>
+              <td class="col-accent" data-label="berth">Named ports reserved atomically with the workspace record; <code>listen</code> maps a declaration to the port the program actually binds; internal gateways forward to the application's IPv4 loopback listener; publications are TCP over IPv4 on host <code>127.0.0.1</code></td>
+              <td data-label="devcontainer / Docker">A declared host mapping per service, unique per environment; keeping two environments from claiming the same host port is your job</td>
+            </tr>
+            <tr>
+              <th scope="row">Data isolation</th>
+              <td class="col-accent" data-label="berth"><code>$BERTH_DATA_DIR</code> per workspace: <code>&lt;workspace&gt;/.berth/data</code> natively, <code>/workspace/.berth/data</code> in a container. <code>berth down</code> keeps it; <code>berth reset</code> wipes it deliberately</td>
+              <td data-label="devcontainer / Docker">A container filesystem plus the volumes and bind mounts you declared; naming, lifetime and cleanup are part of the environment definition</td>
+            </tr>
+            <tr>
+              <th scope="row">Process supervision</th>
+              <td class="col-accent" data-label="berth">The declared process graph, supervised by process-compose natively or by the container engine in container mode, with readiness probes and <code>status</code>/<code>logs</code></td>
+              <td data-label="devcontainer / Docker">The container lifecycle is supervised; supervision of the individual services inside it is something you describe or script</td>
+            </tr>
+            <tr>
+              <th scope="row">Host filesystem speed</th>
+              <td class="col-accent" data-label="berth">Native mode runs on the host filesystem. Container mode keeps the checkout on a writable bind mount, so it inherits the same platform penalty as any container</td>
+              <td data-label="devcontainer / Docker">Native speed on Linux; a bind-mount penalty on macOS and Windows, where the checkout crosses a filesystem boundary on every read and write</td>
+            </tr>
+            <tr>
+              <th scope="row">Toolchain and CI parity</th>
+              <td class="col-accent" data-label="berth">Whatever the host provides, plus a prepared Linux image when you choose the container backend and install your toolchain in it. berth does not claim that a local environment equals CI</td>
+              <td data-label="devcontainer / Docker">The strongest argument for this model: pin the versions once, and the same image can run locally and in CI</td>
+            </tr>
+            <tr>
+              <th scope="row">Security boundary</th>
+              <td class="col-accent" data-label="berth">Not an adversarial sandbox. Git metadata is shared and writable, hooks are user code, and there is no egress policy</td>
+              <td data-label="devcontainer / Docker">OS-level separation. A container with separate credentials, a filesystem policy and an egress policy is the stronger boundary</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="container-strengths">What the container model is genuinely good at</h2>
+      <p>The case for an OS boundary is strong and berth does not argue with it. A container gives you one Linux userland regardless of the laptop underneath, which is the only practical answer when a toolchain officially ships for Linux and you develop on macOS or Windows. It pins language runtimes, system libraries and CLI versions in a file that reviewers can read. It keeps a long-lived project from polluting the host with language version managers, database servers and global packages. It gives you the best available parity story for CI, because the same definition can produce both environments. And it is the only one of the two approaches that keeps working when the code itself is not trusted: a container with its own credentials, filesystem policy, egress policy and resource limits is a boundary berth does not attempt to be.</p>
+
+      <h2 id="container-costs">What that boundary costs</h2>
+      <p>The costs are equally real, and they land on the loop that agent-driven development runs fastest. Every environment pays boot work before the first command — image preparation, container creation and mount setup — and pays it again whenever the definition changes, which is the point at which you rebuild and re-pull everything that depends on the image. On macOS and Windows the checkout is typically bind-mounted from the host, so every file read and write crosses a filesystem boundary; on Linux the same setup runs at native speed. A whole guest userland is resident per environment rather than one process tree, which matters when several environments are open at once. And the model's own isolation gets in the way of the host toolchain: editors, language servers, debuggers and formatters need explicit wiring before they can see the same environment the build uses.</p>
+
+      <h2 id="what-berth-does">What berth does differently</h2>
+      <p>berth isolates the workspace instead of the machine. The default backend is <code>native</code>: ordinary host processes, host filesystem, host toolchain, no virtualization overhead at all, with the workspace's ports, data directory and environment kept separate by construction rather than by a kernel boundary. That is the fast path, and it is why <code>berth new</code> does not need to boot anything.</p>
+      <p>The <code>container</code> backend exists for the two cases the native path cannot cover: a program that hardcodes a listen port, and a toolchain that only exists on Linux. It deliberately behaves nothing like a per-command container workflow. One prepared image is reused per workspace; nothing is built during a command; nothing is pulled implicitly; and if the engine or the image is missing, berth reports that and stops rather than quietly running the command on the host. The image must provide <code>bash</code>, <code>sh</code>, <code>sleep</code>, <code>socat</code>, <code>git</code> and process-compose v1.122.0 alongside your project tools, because the gateway that preserves hardcoded loopback ports is built from those pieces: the checkout is mounted at <code>/workspace</code>, shared Git metadata at <code>/berth/git</code>, and an internal forwarder carries traffic from a reserved high container port to the application's IPv4 loopback listener. <code>plan.gateway_ports</code> lists the internal reservations that application listeners must not use, and publications bind to <code>127.0.0.1</code> on the host.</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="version: 1
+base: main
+runtime:
+  backend: container
+  engine: docker
+  image: berth-runtime:local
+ports: [web]
+listen:
+  web: 8080          # the port the program hardcodes inside the container" aria-label="Copy the container-mode berth.yaml example">Copy</button>
+        <pre><code>version: 1
+base: main
+runtime:
+  backend: container
+  engine: docker
+  image: berth-runtime:local
+ports: [web]
+listen:
+  web: 8080          # the port the program hardcodes inside the container</code></pre>
+      </div>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="berth new fixed-port --up      # native: host processes, no container
+berth plan fixed-port            # the execution contract, before anything starts
+berth ports                      # allocations and container listen mappings
+berth status --json              # readiness, not sleep loops" aria-label="Copy the inspection commands">Copy</button>
+        <pre><code>berth new fixed-port --up      # native: host processes, no container
+berth plan fixed-port            # the execution contract, before anything starts
+berth ports                      # allocations and container listen mappings
+berth status --json              # readiness, not sleep loops</code></pre>
+      </div>
+
+      <h2 id="one-way-door">Choosing a backend is a one-way door</h2>
+      <p>Switch deliberately, because the decision is stored. The runtime and port contract — backend, image reference, engine, limits and the named port set — is immutable for an existing workspace, so moving from native to container (or the reverse) means creating a new workspace rather than editing the old one. That is a deliberate trade: it prevents a running environment from silently changing meaning or controlling resources it was not created for, at the cost of a migration when your needs change. The full rules, including what a probe sees in each mode, are in the <a href="./runtime.html">runtime contract</a>.</p>
+
+      <div class="note">
+        <p><strong>No implicit anything.</strong> berth never builds an image per command, never pulls one implicitly, and never falls back to running the command on the host when the engine or image is unavailable. A missing engine or a missing image is an error to fix, not a silent downgrade — the service runs on the host only when the configuration says <code>native</code>.</p>
+      </div>
+
+      <h2 id="security">Security: what berth is not</h2>
+      <p>berth is not an adversarial sandbox, and it should not be described as one. In native mode it isolates reserved ports, data directories and environment variables, and nothing else: hardcoded loopback ports, absolute storage paths, Unix sockets, registries, shared credentials and arbitrary host access are not isolated. Even in container mode, Git metadata is shared with the host and writable, hooks and process commands are user code that executes with the workspace's authority, and there is no egress firewall — a separate network namespace prevents internal loopback and port collisions, and does nothing to restrict outbound access. An untrusted agent needs separate credentials, a filesystem policy, an egress policy and resource enforcement. A container configured with those is the stronger boundary, and the correct choice for running code you do not trust.</p>
+
+      <div class="note">
+        <p><strong>If your requirement is OS-level isolation or CI parity, use the container.</strong> berth is not a replacement for a devcontainer or a plain Docker setup in that case, and its container backend is not an attempt to be one — it is one prepared Linux image per workspace, used to give the workspace a Linux userland, not to replace your environment definition.</p>
+      </div>
+
+      <nav class="page-nav" aria-label="Documentation pagination">
+        <a class="btn btn-ghost" href="./comparison-git-worktree.html">← berth vs raw git worktree</a>
+        <a class="btn btn-ghost" href="./runtime.html">Runtime contract →</a>
+        <a class="btn btn-ghost" href="./comparison-agents.html">berth vs parallel-agent tooling →</a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>Fast, low-cost management of parallel development environments. One workspace per task: worktree, data, ports and processes.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          <li><a href="./getting-started.html">Getting started</a></li>
+          <li><a href="./features.html">Features &amp; configuration</a></li>
+          <li><a href="./runtime.html">Runtime contract</a></li>
+          <li><a href="./architecture.html">Architecture</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Comparisons</h2>
+        <ul>
+          <li><a href="./comparison-git-worktree.html">vs raw git worktree</a></li>
+          <li><a href="./comparison-devcontainer.html">vs devcontainer / Docker</a></li>
+          <li><a href="./comparison-agents.html">vs orchestration tools</a></li>
+          <li><a href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文文档</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub repository</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">Releases</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">Issues</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT licensed · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth is a local workspace manager, not a security sandbox.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* copy stays manual */ }
+    document.body.removeChild(area);
+  }
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+})();
+</script>
+</body>
+</html>

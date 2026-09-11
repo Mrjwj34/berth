@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features &amp; configuration — berth documentation</title>
+<meta name="description" content="The complete berth.yaml reference: workspaces, native and container runtimes, named ports, private data, copy-on-write dependencies, hooks, processes, readiness probes, garbage collection and agent integration.">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/docs/features.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="Features &amp; configuration — berth documentation">
+<meta property="og:description" content="Workspaces, dual runtimes, named ports, private data, copy-on-write dependencies, hooks, supervised processes, garbage collection and agent integration.">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/docs/features.html">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth architecture diagram">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./getting-started.html">Docs</a>
+      <a class="nav-docs" href="./features.html" aria-current="page">Features</a>
+      <a class="nav-docs" href="./runtime.html">Runtime</a>
+      <a class="nav-docs" href="./architecture.html">Architecture</a>
+      <a class="nav-docs" href="./comparison-devcontainer.html">Compare</a>
+      <a class="nav-lang" href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <nav class="subnav" aria-label="Documentation">
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./features.html" aria-current="page">Features &amp; configuration</a>
+      <a href="./runtime.html">Runtime contract</a>
+      <a href="./architecture.html">Architecture</a>
+      <a href="./comparison-git-worktree.html">vs git worktree</a>
+      <a href="./comparison-devcontainer.html">vs devcontainer</a>
+      <a href="./comparison-agents.html">vs agent tools</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <p class="crumbs"><a href="../index.html">berth</a> / Documentation / Features</p>
+      <h1>Features and configuration</h1>
+      <p>A workspace is the unit berth manages: an isolated Git worktree, a private data directory, a reserved set of ports and a supervised process graph. This page explains each concept, documents every <code>berth.yaml</code> field and lists the traps that make a render fail.</p>
+    </header>
+
+    <article class="prose">
+      <h2 id="concepts">Core concepts</h2>
+
+      <h3>Workspaces</h3>
+      <p>A workspace combines an isolated Git worktree, a private data directory, dynamically allocated ports and a set of supervised background processes. Each workspace reads its own branch configuration, so a change to <code>berth.yaml</code> in one workspace never affects another.</p>
+      <p>Workspaces are created beside the repository in <code>&lt;repo&gt;.berths/&lt;slug&gt;</code> — or under <code>worktree_root</code> when it is set — on branch <code>berth/&lt;slug&gt;</code>. A slug is lowercase ASCII letters, digits, <code>-</code> and <code>_</code> only. The primary checkout is never a workspace, and the commands that take no slug (<code>berth run</code>, <code>berth open</code>) resolve the workspace from the current directory, so run them from inside the path that <code>berth new</code> printed.</p>
+
+      <h3>Dual runtime modes</h3>
+      <p><strong>Native</strong> runs ordinary processes directly on the host. It relies on environment variables and command-line flags to assign dynamic ports and data paths, which makes it the fastest option with zero container overhead. It does not isolate hardcoded loopback ports, absolute storage paths, Unix sockets, registries or shared credentials.</p>
+      <p><strong>Container</strong> runs one reusable Linux container per workspace using an existing local Docker or Podman engine. It preserves hardcoded loopback ports through internal forwarding gateways: if the application insists on binding <code>8080</code> or <code>5432</code>, the container isolates the network namespace while host traffic still reaches the service.</p>
+
+      <h3>Port allocation</h3>
+      <p>Ports are declared by name in <code>berth.yaml</code> — <code>ports: [web, pg]</code> — and every workspace receives unique host ports for those names. The reservation happens in the same atomic transaction that registers the workspace, so two concurrent <code>berth new</code> runs cannot be handed the same value, and the assignment stays stable for the lifetime of the workspace.</p>
+      <p>Programs read the result from the environment: <code>BERTH_PORT_WEB</code> for the port inside the execution context and <code>BERTH_HOST_PORT_WEB</code> for the host publication on <code>127.0.0.1</code>.</p>
+
+      <h3>Private data and state isolation</h3>
+      <p>Each workspace gets its own data directory: <code>.berth/data</code> in native mode and <code>/workspace/.berth/data</code> in container mode, exported as <code>$BERTH_DATA_DIR</code>. Databases, caches and scratch files stay isolated to the workspace. Writable dependencies can be copied with copy-on-write on filesystems that support it — Linux reflink, macOS clonefile — so a large dependency tree does not double disk usage, and an independent copy is taken everywhere else.</p>
+
+      <h3>Daemonless operation</h3>
+      <p>berth runs no continuous background daemon. It relies on file locks and a single machine-level registry file. Long operations hold their own workspace lock rather than a global machine lock, so separate workspaces proceed concurrently while commands inside one workspace serialize. Process supervision is delegated to process-compose or to the container runtime.</p>
+
+      <h2 id="reference">Configuration reference: berth.yaml</h2>
+      <p><code>berth.yaml</code> lives at the repository root and is read from each workspace’s own branch, so commit it before creating a workspace.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <caption>All fields are optional except <code>version</code> and the process <code>command</code>; <code>runtime.*</code> and <code>listen</code> are container-only.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Field</th>
+              <th scope="col">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><code>version</code></th>
+              <td data-label="Notes">Must be <code>1</code>.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>base</code></th>
+              <td data-label="Notes">Baseline branch for new workspaces; defaults to <code>main</code>.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>worktree_root</code></th>
+              <td data-label="Notes">Where worktrees are created. Relative values resolve inside the repository, absolute values do not. Defaults to the sibling <code>&lt;repo&gt;.berths</code> directory.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>runtime.backend</code></th>
+              <td data-label="Notes"><code>native</code> or <code>container</code>; defaults to <code>native</code>.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>runtime.engine</code></th>
+              <td data-label="Notes"><code>docker</code> or <code>podman</code>; container only, defaults to <code>docker</code>.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>runtime.image</code></th>
+              <td data-label="Notes">Prebuilt Linux image; container only and mandatory.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>runtime.memory</code>, <code>runtime.cpus</code>, <code>runtime.user</code></th>
+              <td data-label="Notes">Optional container overrides such as <code>2g</code>, <code>2</code> or a UID/GID. Native mode rejects them.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>ports</code></th>
+              <td data-label="Notes">Named ports such as <code>[web, pg]</code>. A name becomes <code>BERTH_PORT_&lt;NAME&gt;</code>. The name <code>pc</code> is reserved.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>listen</code></th>
+              <td data-label="Notes">Container listen port per declared port, for example <code>{web: 8080}</code>. Container mode requires one entry per declared port.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>env</code></th>
+              <td data-label="Notes">Extra variables for every process, hook and <code>berth run</code>. Keys may not start with <code>BERTH_</code>; <code>GIT_DIR</code> and <code>GIT_WORK_TREE</code> are reserved. Values stay single-line and expand <code>${VAR}</code> from the environment contract.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>env_file</code></th>
+              <td data-label="Notes">Repository-relative file berth writes with a managed <code># BEGIN BERTH</code> / <code># END BERTH</code> block, for host tools that read dotenv files.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>copy_dirs</code></th>
+              <td data-label="Notes">Repository-relative directories copied into each new workspace, with copy-on-write where the filesystem supports it.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>hooks.setup</code></th>
+              <td data-label="Notes">Shell commands that run on create, on <code>up</code> after a failed setup, and on <code>reset</code>. They must be idempotent.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>hooks.teardown</code></th>
+              <td data-label="Notes">Shell commands that run before an owned workspace is removed.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>processes.&lt;name&gt;.command</code></th>
+              <td data-label="Notes">Required for a managed process.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>processes.&lt;name&gt;.working_dir</code></th>
+              <td data-label="Notes">Defaults to the workspace root (<code>/workspace</code> in container mode).</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>processes.&lt;name&gt;.environment</code></th>
+              <td data-label="Notes">A <strong>list</strong> of <code>KEY=VALUE</code> strings, not a mapping. berth prepends its identity variables and refuses <code>BERTH_*</code> and <code>GIT_*</code> overrides.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>processes.&lt;name&gt;.readiness_probe</code></th>
+              <td data-label="Notes"><code>http_get</code> (<code>host</code>, <code>port</code>, <code>path</code>) or <code>exec</code> (<code>command</code>), with <code>initial_delay_seconds</code>, <code>period_seconds</code> and <code>failure_threshold</code>.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>processes.&lt;name&gt;.*</code></th>
+              <td data-label="Notes">The mapping is passed through to process-compose v0.5, so its other documented fields — <code>log_location</code>, <code>depends_on</code>, <code>restart</code> — work too.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>gc.idle_stop_hours</code></th>
+              <td data-label="Notes"><code>berth gc</code> stops the runtime of a workspace unused for this long. <code>0</code> disables.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>gc.remove_after_days</code></th>
+              <td data-label="Notes">Age beyond which a stopped, merged workspace becomes a removal candidate. <code>0</code> disables.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>gc.max_workspaces</code></th>
+              <td data-label="Notes">Per-repository quota; <code>berth gc</code> evicts above it once commits are preserved. <code>0</code> disables.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="include">Worktree include file</h2>
+      <p>A <code>.worktreeinclude</code> file at the repository root lists repository-relative paths, one per line, with <code>#</code> for comments. Each listed path is copied into a new worktree during setup — <code>berth new</code>, <code>berth reset</code>, <code>berth adopt --setup</code> — and entries that do not exist are skipped.</p>
+      <p>It is a plain path list, not a <code>.gitignore</code> pattern file: use it for individual local gitignored files such as <code>.env</code>, and use <code>copy_dirs</code> for whole dependency trees.</p>
+
+      <h2 id="examples">Practical examples</h2>
+
+      <h3>Native Node.js web application</h3>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="version: 1
+base: main
+ports: [web]
+env:
+  PORT: ${BERTH_PORT_WEB}
+processes:
+  web:
+    command: npm run dev -- --port &quot;$BERTH_PORT_WEB&quot;
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: &quot;${BERTH_PORT_WEB}&quot;
+        path: /" aria-label="Copy the native web application example">Copy</button>
+        <pre><code>version: 1
+base: main
+ports: [web]
+env:
+  PORT: ${BERTH_PORT_WEB}
+processes:
+  web:
+    command: npm run dev -- --port "$BERTH_PORT_WEB"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "${BERTH_PORT_WEB}"
+        path: /</code></pre>
+      </div>
+
+      <h3>Native application with a managed PostgreSQL service</h3>
+      <p>The database lives in <code>$BERTH_DATA_DIR</code>, so each workspace initialises and migrates its own cluster while sharing the installed binaries.</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="version: 1
+base: main
+ports: [web, pg]
+env:
+  PORT: ${BERTH_PORT_WEB}
+  DATABASE_URL: postgres://127.0.0.1:${BERTH_PORT_PG}/app
+hooks:
+  setup:
+    - mkdir -p &quot;$BERTH_DATA_DIR/pg&quot;
+    - test -d &quot;$BERTH_DATA_DIR/pg/base&quot; || initdb -D &quot;$BERTH_DATA_DIR/pg&quot; --no-locale --encoding=UTF8
+processes:
+  pg:
+    command: &gt;
+      postgres -D &quot;$BERTH_DATA_DIR/pg&quot; -p &quot;$BERTH_PORT_PG&quot; -k &quot;$BERTH_DATA_DIR&quot;
+      -c fsync=off -c synchronous_commit=off
+    readiness_probe:
+      exec:
+        command: pg_isready -h 127.0.0.1 -p &quot;$BERTH_PORT_PG&quot;
+  web:
+    command: npm run dev -- --port &quot;$BERTH_PORT_WEB&quot;
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: &quot;${BERTH_PORT_WEB}&quot;
+        path: /" aria-label="Copy the PostgreSQL service example">Copy</button>
+        <pre><code>version: 1
+base: main
+ports: [web, pg]
+env:
+  PORT: ${BERTH_PORT_WEB}
+  DATABASE_URL: postgres://127.0.0.1:${BERTH_PORT_PG}/app
+hooks:
+  setup:
+    - mkdir -p "$BERTH_DATA_DIR/pg"
+    - test -d "$BERTH_DATA_DIR/pg/base" || initdb -D "$BERTH_DATA_DIR/pg" --no-locale --encoding=UTF8
+processes:
+  pg:
+    command: &gt;
+      postgres -D "$BERTH_DATA_DIR/pg" -p "$BERTH_PORT_PG" -k "$BERTH_DATA_DIR"
+      -c fsync=off -c synchronous_commit=off
+    readiness_probe:
+      exec:
+        command: pg_isready -h 127.0.0.1 -p "$BERTH_PORT_PG"
+  web:
+    command: npm run dev -- --port "$BERTH_PORT_WEB"
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: "${BERTH_PORT_WEB}"
+        path: /</code></pre>
+      </div>
+
+      <h3>Container mode with a fixed listen port</h3>
+      <p>When the application hardcodes port <code>8080</code> and cannot read dynamic environment variables, declare the original port under <code>listen</code> and let berth publish it on the host.</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="version: 1
+base: main
+runtime:
+  backend: container
+  engine: docker
+  image: berth-runtime:local
+ports: [web]
+listen:
+  web: 8080
+processes:
+  web:
+    command: python3 -m http.server 8080 --bind 127.0.0.1
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8080
+        path: /" aria-label="Copy the container mode example">Copy</button>
+        <pre><code>version: 1
+base: main
+runtime:
+  backend: container
+  engine: docker
+  image: berth-runtime:local
+ports: [web]
+listen:
+  web: 8080
+processes:
+  web:
+    command: python3 -m http.server 8080 --bind 127.0.0.1
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8080
+        path: /</code></pre>
+      </div>
+      <p>Note that the probe runs in the execution context, so it uses the internal listen port (<code>8080</code>) rather than <code>BERTH_HOST_PORT_WEB</code>.</p>
+
+      <h3>Accelerating data initialisation with copy-on-write</h3>
+      <p>For large databases, running full migrations in every workspace is slow. Keep a cleanly initialised template directory and clone it instantaneously:</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="version: 1
+base: main
+ports: [pg]
+hooks:
+  setup:
+    - |
+      if [ ! -d &quot;$BERTH_DATA_DIR/pg/base&quot; ]; then
+        cp -a --reflink=auto .seed/pg &quot;$BERTH_DATA_DIR/pg&quot; 2&gt;/dev/null || \
+        (mkdir -p &quot;$BERTH_DATA_DIR/pg&quot; &amp;&amp; initdb -D &quot;$BERTH_DATA_DIR/pg&quot; --no-locale --encoding=UTF8)
+      fi" aria-label="Copy the copy-on-write seeding example">Copy</button>
+        <pre><code>version: 1
+base: main
+ports: [pg]
+hooks:
+  setup:
+    - |
+      if [ ! -d "$BERTH_DATA_DIR/pg/base" ]; then
+        cp -a --reflink=auto .seed/pg "$BERTH_DATA_DIR/pg" 2&gt;/dev/null || \
+        (mkdir -p "$BERTH_DATA_DIR/pg" &amp;&amp; initdb -D "$BERTH_DATA_DIR/pg" --no-locale --encoding=UTF8)
+      fi</code></pre>
+      </div>
+      <p>On Linux with btrfs or xfs, and macOS with APFS, files clone in milliseconds without consuming initial disk space.</p>
+
+      <h2 id="traps">Traps that fail a render</h2>
+      <ul>
+        <li><strong><code>environment</code> is a list, not a mapping.</strong> <code>environment: {KEY: value}</code> fails with “must be a list”. Write <code>environment: ["KEY=value"]</code>.</li>
+        <li><strong>The runtime contract is immutable.</strong> Changing <code>runtime.*</code> or the named-port set makes an existing workspace unusable (“port contract changed; create a new workspace”). Changing processes, hooks or <code>env</code> inside the workspace is supported; changing the runtime or port contract means creating a new workspace.</li>
+        <li><strong>Reserved names.</strong> <code>pc</code> cannot be a port name, and <code>env</code> keys cannot start with <code>BERTH_</code>, <code>GIT_DIR</code> or <code>GIT_WORK_TREE</code>, because berth injects those into every process.</li>
+        <li><strong>Probe ports follow the execution context.</strong> A container probe uses the internal <code>listen</code> port, never <code>BERTH_HOST_PORT_*</code>.</li>
+        <li><strong><code>copy_dirs</code> and <code>.worktreeinclude</code> differ.</strong> <code>copy_dirs</code> copies whole dependency trees with copy-on-write where supported; <code>.worktreeinclude</code> copies individual files and is a plain path list.</li>
+        <li><strong><code>.berth/</code> is machine state.</strong> It holds the private data directory, the generated <code>pc.yaml</code>, the supervisor log and the identity marker. Keep it out of version control and never hand-edit it.</li>
+      </ul>
+
+      <h2 id="environment">Environment variables</h2>
+      <p>berth injects the following into every hook, service and <code>berth run</code> command:</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Variable</th>
+              <th scope="col">Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><code>BERTH_WORKSPACE</code></th>
+              <td data-label="Meaning">Absolute path to the workspace directory</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>BERTH_ROOT</code></th>
+              <td data-label="Meaning">Path to the primary Git repository</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>BERTH_DATA_DIR</code></th>
+              <td data-label="Meaning">Private data storage path for this workspace</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>BERTH_SLUG</code></th>
+              <td data-label="Meaning">Workspace slug identifier</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>BERTH_BRANCH</code></th>
+              <td data-label="Meaning">Git branch associated with this workspace</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>BERTH_PORT_&lt;NAME&gt;</code></th>
+              <td data-label="Meaning">Internal listening port for the named service</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>BERTH_HOST_PORT_&lt;NAME&gt;</code></th>
+              <td data-label="Meaning">Published host port on <code>127.0.0.1</code> for browser access</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>In container mode, additional Git metadata variables are provided: <code>GIT_DIR</code>, <code>GIT_WORK_TREE</code>, <code>HOME</code> and <code>XDG_CACHE_HOME</code>.</p>
+
+      <h2 id="container-image">What the container image must provide</h2>
+      <p><code>runtime.backend: container</code> needs an existing Linux image and a <code>listen</code> entry for every declared port. The image must contain bash, sh, sleep, socat, git, python3 and process-compose v1.122.0 alongside the project toolchain. The checked-in <code>runtime/Dockerfile</code> in the berth repository is the reference and takes <code>BASE_IMAGE</code> as a build argument.</p>
+      <p>Build dependencies into the image once rather than on every run: berth never builds or pulls an image implicitly, and it never falls back to running a command on the host when the engine or image is missing.</p>
+
+      <h2 id="agents">Integration with coding agents</h2>
+      <p>berth is a plain CLI, so any agent that can run shell commands can drive it. On top of that, <code>berth init</code> installs one skill into the shared <code>.agents/skills</code> convention that most harnesses already read.</p>
+
+      <h3>Installing the skill</h3>
+      <p><code>berth init</code> and a bare <code>berth skill install</code> deploy the skill to <code>&lt;repo&gt;/.agents/skills/berth/SKILL.md</code>, the location twelve harnesses read directly: Codex, Cursor, GitHub Copilot, Gemini CLI, opencode, Windsurf/Devin Desktop, Roo Code, Kilo Code, Zed, JetBrains Junie, Google Antigravity and pi. For Zed that location is the only skills root; for Junie and pi, project skills load only once the project is trusted.</p>
+      <p>Two harnesses do not read the shared convention, so they get their own copy when they are named explicitly:</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Command</th>
+              <th scope="col">Writes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><code>berth skill install</code></th>
+              <td data-label="Writes"><code>&lt;repo&gt;/.agents/skills/berth/</code></td>
+            </tr>
+            <tr>
+              <th scope="row"><code>berth skill install --agent claude</code></th>
+              <td data-label="Writes"><code>&lt;repo&gt;/.claude/skills/berth/</code></td>
+            </tr>
+            <tr>
+              <th scope="row"><code>berth skill install --agent cline</code></th>
+              <td data-label="Writes"><code>&lt;repo&gt;/.cline/skills/berth/</code></td>
+            </tr>
+            <tr>
+              <th scope="row"><code>berth skill install --all</code></th>
+              <td data-label="Writes">Every path above</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>berth skill install --scope user</code></th>
+              <td data-label="Writes">The same relative paths under your home directory, never inside the repository</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>--agent</code> accepts a comma-separated list and may be repeated; an unknown name fails with the list of valid names. Project scope writes only inside the repository, user scope only inside the home directory. Every install is idempotent: a repeat run rewrites nothing and reports <code>already installed</code>. berth writes nothing into <code>AGENTS.md</code>, <code>GEMINI.md</code> or any harness’s own rules file, and <code>berth agents [--json]</code> reports which harness reads which path and whether each artifact is currently installed.</p>
+      <p>The skill can also be installed without the binary at all: <code>npx skills add Mrjwj34/berth</code>. It checks for the binary first and tells your agent how to install berth when it is missing.</p>
+
+      <h3>Installing worktree hooks</h3>
+      <p>berth installs exactly one kind of hook: the moment a harness creates a Git worktree, so that worktree registers itself with <code>berth adopt --setup</code>. It installs no session-end, interrupt or per-tool hooks — those run on a small time budget or on the critical path of every action, where a <code>berth down</code> that waits for supervised processes would be cancelled rather than completed.</p>
+      <ul>
+        <li><code>berth hook install</code> (or <code>berth hook install cursor</code>) merges <code>berth adopt --setup</code> into <code>.cursor/worktrees.json</code>, which Cursor runs inside every worktree it creates in the Agents Window, the IDE or the CLI. The three <code>setup-worktree*</code> arrays are appended to only when they hold no berth entry: every existing command and every unknown key in the file is preserved, and a file berth cannot parse is reported instead of overwritten.</li>
+        <li><code>berth hook install windsurf</code> appends the same command to <code>post_setup_worktree</code> in <code>.windsurf/hooks.json</code>, creating the file when it is absent. Windsurf merges hook files across system, user and workspace scope, so this adds an entry rather than replacing one.</li>
+        <li><code>berth hook install --agent claude</code> adds a <code>WorktreeCreate</code> hook to <code>.claude/settings.json</code> as a sibling of the events already configured there, preserving every other key. It is opt-in — <code>all</code> deliberately skips it — because Claude Code aborts worktree creation when a <code>WorktreeCreate</code> hook exits non-zero. The installed command therefore ends with <code>|| exit 0</code>: a failed adoption prints its diagnosis on stderr and leaves the checkout for <code>berth gc</code>, and it can never block Claude.</li>
+      </ul>
+      <p>Every hook file is written through a temporary file and a rename, because no harness documents a locking or partial-write contract for third-party hook installation. Running any install twice is a no-op.</p>
+      <p>The remaining harnesses are driven by the skill alone. Codex, opencode, Kilo Code, pi, Gemini CLI and Antigravity document no repository-side worktree setup hook, and Junie, Cline and Antigravity create worktrees with no hook surface at all, so those worktrees are registered manually with <code>berth adopt --setup</code> or <code>berth new &lt;slug&gt;</code>.</p>
+
+      <div class="note">
+        <p><strong>Session-end hooks are deliberately not installed anywhere.</strong> Codex caps its synchronous <code>SessionEnd</code> at a few seconds while <code>berth down</code> waits for processes to exit, and the other harnesses do not promise an event when a worktree or conversation goes away. Stop work explicitly with <code>berth down</code> (keep data) or <code>berth done</code> (release the workspace), and let <code>berth gc</code> reclaim what was abandoned — <code>gc.idle_stop_hours</code> makes it stop idle runtimes.</p>
+      </div>
+
+      <h3>Guiding your agent</h3>
+      <p>With the skill installed, you can ask for work directly in an isolated workspace:</p>
+      <div class="note">
+        <p><strong>Prompt:</strong> “Create a new workspace named auth-refactor using berth, start the services, and implement the token renewal endpoint.”</p>
+      </div>
+      <p>The agent uses the embedded skill to run berth commands, verify service health with <code>berth status --json</code> and read failures from <code>berth logs &lt;proc&gt;</code>, then runs tests through <code>berth run</code> inside the dedicated environment.</p>
+
+      <nav class="page-nav" aria-label="Documentation pagination">
+        <a class="btn btn-ghost" href="./getting-started.html">← Getting started</a>
+        <a class="btn btn-ghost" href="./runtime.html">Runtime contract →</a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>Fast, low-cost management of parallel development environments. One workspace per task: worktree, data, ports and processes.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          <li><a href="./getting-started.html">Getting started</a></li>
+          <li><a href="./features.html">Features &amp; configuration</a></li>
+          <li><a href="./runtime.html">Runtime contract</a></li>
+          <li><a href="./architecture.html">Architecture</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Comparisons</h2>
+        <ul>
+          <li><a href="./comparison-git-worktree.html">vs raw git worktree</a></li>
+          <li><a href="./comparison-devcontainer.html">vs devcontainer / Docker</a></li>
+          <li><a href="./comparison-agents.html">vs orchestration tools</a></li>
+          <li><a href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文文档</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub repository</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">Releases</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">Issues</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT licensed · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth is a local workspace manager, not a security sandbox.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* copy stays manual */ }
+    document.body.removeChild(area);
+  }
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+})();
+</script>
+</body>
+</html>

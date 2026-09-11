@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — berth documentation</title>
+<meta name="description" content="berth's architecture: component boundaries, why there is no syscall-interception backend and no daemon, the ten safety invariants, registry migration, recovery intent and how the behaviour is validated.">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/docs/architecture.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="Architecture — berth documentation">
+<meta property="og:description" content="Component boundaries, the daemonless lock model, ten safety invariants, recovery intent and validation strategy.">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/docs/architecture.html">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth architecture diagram">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./getting-started.html">Docs</a>
+      <a class="nav-docs" href="./features.html">Features</a>
+      <a class="nav-docs" href="./runtime.html">Runtime</a>
+      <a class="nav-docs" href="./architecture.html" aria-current="page">Architecture</a>
+      <a class="nav-docs" href="./comparison-devcontainer.html">Compare</a>
+      <a class="nav-lang" href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <nav class="subnav" aria-label="Documentation">
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./features.html">Features &amp; configuration</a>
+      <a href="./runtime.html">Runtime contract</a>
+      <a href="./architecture.html" aria-current="page">Architecture</a>
+      <a href="./comparison-git-worktree.html">vs git worktree</a>
+      <a href="./comparison-devcontainer.html">vs devcontainer</a>
+      <a href="./comparison-agents.html">vs agent tools</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <p class="crumbs"><a href="../index.html">berth</a> / Documentation / Architecture</p>
+      <h1>Architecture: explicit runtimes, safe lifecycle</h1>
+      <p>The goal is low-overhead local environments for parallel agent development. This page records the decisions that shape the tool: where the boundaries are, which subsystems own what, the invariants that cannot be traded away, and how the behaviour is validated.</p>
+    </header>
+
+    <article class="prose">
+      <figure class="shot shot--diagram">
+        <img src="https://cdn.jwjbox.dev/berth-architecture.png" width="1448" height="1086" alt="Architecture diagram: the CLI and workspace records sit above a single execution context that serves services, hooks, probes and one-off commands, with native and container backends below it.">
+        <figcaption>Workspace management is separated from the execution context: one runtime per workspace, two selectable backends behind it.</figcaption>
+      </figure>
+
+      <h2 id="boundaries">Component boundaries</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Component</th>
+              <th scope="col">Owns</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><code>cmd/berth</code></th>
+              <td data-label="Owns">CLI parsing, JSON and text output, cancellation and exit status</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>app</code></th>
+              <td data-label="Owns">Ownership, operation locking, setup state, safe lifecycle and configuration scope</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>runner.Session</code></th>
+              <td data-label="Owns">The single execution context shared by services, <code>run</code>, hooks and probes</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>process</code></th>
+              <td data-label="Owns">The native process-compose adapter: rendering, readiness and pinned binary installation</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>worktree</code>, <code>copyfs</code>, <code>ports</code>, <code>state</code></th>
+              <td data-label="Owns">Narrow reusable primitives — checkout creation, copy-on-write dependency copies, port reservation, the locked registry</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>gc</code></th>
+              <td data-label="Owns">Conservative eligibility selection, revalidated under the lifecycle lock before anything is collected</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="decisions">Why the design looks like this</h2>
+
+      <h3>No syscall-interception backend</h3>
+      <p>There is no libc, dyld or seccomp injection backend. Adding a third OS-specific syscall-compatibility implementation is not necessary for the core parallel-development workflow: projects that accept a port and a data path through configuration get full isolation of the things that actually collide, without paying for a compatibility layer that would only ever be partial.</p>
+
+      <h3>The native fast path stays independent</h3>
+      <p>The native backend depends on no container engine. The isolated path reuses a shared Linux engine and a prepared image with one namespace and one container per workspace. Future engine-specific optimisations belong behind <code>Session</code> rather than in individual command handlers, so a new engine does not leak into every command.</p>
+
+      <h3>No daemon, deliberately</h3>
+      <p>A separate daemon is not introduced because it would add a lifecycle problem without solving one: registry updates are short, workspace operations hold only their own lock, and the existing process-compose or container engine already supplies long-lived supervision.</p>
+      <p>Separate workspace operations can therefore proceed concurrently, while commands in the same workspace serialize. A shared read/execution lease is a possible later extension if measurements justify it — not something to build pre-emptively.</p>
+
+      <h2 id="invariants">Invariants</h2>
+      <ol>
+        <li>Primary repositories, their ancestors and wrong Git identities are never removal targets.</li>
+        <li>Automatic GC never grants force authority. Clean is not equivalent to preserved.</li>
+        <li>Imported or adopted records never gain deletion ownership through migration.</li>
+        <li>Port allocation and registry insertion form one cross-process transaction.</li>
+        <li>Unknown process or engine state prevents destructive cleanup.</li>
+        <li>Incomplete setup is recorded and retried, not treated as completed initialisation.</li>
+        <li>Copies of writable dependencies are independent, including on fallback paths.</li>
+        <li>Service, test, migration, hook and probe share the workspace execution context.</li>
+        <li>Image or backend failure does not silently run a command on the host instead.</li>
+        <li>JSON stdout is not mixed with setup or teardown command output.</li>
+      </ol>
+
+      <h2 id="recovery">Registry, adoption and recovery</h2>
+      <p>The registry moves from version 1 to 2. Legacy ownership stays empty until an explicit adoption, which grants only adopted ownership. A crash after Git creates a checkout but before berth registers it leaves an unregistered checkout that can be adopted — no destructive guess is made about it.</p>
+      <p>Runtime control endpoints live outside newly created native checkouts. PID checks after a native shutdown are only used to wait, never to kill a potentially reused PID, and native API tokens isolate the control endpoints.</p>
+      <p>Recovery intent is stored in the existing workspace record under its operation lock: <code>reset_pending</code> precedes runtime and data destruction, and <code>removal_head</code> follows teardown and shutdown, preceding checkout removal. Reset retries finish the reset before setup. Removal retries keep repository identity checks and delete only the recorded commit, using <a href="https://git-scm.com/docs/git-update-ref">Git’s compare-and-delete</a>. GC never discards pending removal records or grants them force authority. No separate journal service or background recovery process is needed.</p>
+
+      <h2 id="validation">How it is validated</h2>
+      <p>Unit and regression coverage includes independent copies, same-source copies, primary-checkout protection, adopted-checkout preservation, clean unpublished commits, setup retry using branch-local configuration, unknown-stop safety, GC versus active operations, independent-process port allocation, runtime argument generation, host and internal port semantics, strict config parsing, checksums and readiness.</p>
+      <p>Recovery tests interrupt a reset with invalid data paths and interrupt a removal while holding real Git ref locks, including the changed, already-deleted and checked-out branch cases.</p>
+      <p>The Linux container acceptance test holds a host sentinel on the same original port used inside two concurrent workspaces. It verifies that the host sentinel and the workspace servers do not get confused, and checks hooks, private data, Git, argv and shell execution, reuse across <code>up</code>/<code>down</code>, cancellation, sibling survival and safe removal. A missing engine or image fails that test rather than skipping it.</p>
+      <p>CI runs native CLI acceptance on all three hosted operating systems: parallel workspace creation, real HTTP, JSON output, hooks, argv and exit codes, restart, reset and safe removal. Docker and Podman Desktop execution on macOS and Windows, and rootless engine variations, still require those actual environments.</p>
+
+      <div class="note">
+        <p><strong>No unmeasured latency or memory figure is a release service-level objective.</strong> Benchmarks are expected to separate cold image preparation, warm workspace creation, dependency copying, process readiness and incremental run latency, because those are the phases that behave independently.</p>
+      </div>
+
+      <nav class="page-nav" aria-label="Documentation pagination">
+        <a class="btn btn-ghost" href="./runtime.html">← Runtime contract</a>
+        <a class="btn btn-ghost" href="./comparison-git-worktree.html">berth vs raw git worktree →</a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>Fast, low-cost management of parallel development environments. One workspace per task: worktree, data, ports and processes.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          <li><a href="./getting-started.html">Getting started</a></li>
+          <li><a href="./features.html">Features &amp; configuration</a></li>
+          <li><a href="./runtime.html">Runtime contract</a></li>
+          <li><a href="./architecture.html">Architecture</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Comparisons</h2>
+        <ul>
+          <li><a href="./comparison-git-worktree.html">vs raw git worktree</a></li>
+          <li><a href="./comparison-devcontainer.html">vs devcontainer / Docker</a></li>
+          <li><a href="./comparison-agents.html">vs orchestration tools</a></li>
+          <li><a href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文文档</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub repository</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">Releases</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">Issues</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT licensed · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth is a local workspace manager, not a security sandbox.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* copy stays manual */ }
+    document.body.removeChild(area);
+  }
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+})();
+</script>
+</body>
+</html>

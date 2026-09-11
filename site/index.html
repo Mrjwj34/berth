@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>berth — isolated local workspaces for parallel coding agents</title>
+<meta name="description" content="berth is an MIT-licensed Go CLI that gives every coding agent its own Git worktree, private data directory, reserved ports and supervised processes — millisecond local environments with no daemon and no VM overhead.">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="berth — isolated local workspaces for parallel coding agents">
+<meta property="og:description" content="One linked Git worktree, a private data directory, atomically reserved ports and supervised processes per task. No daemon, no VM overhead.">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth architecture diagram">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="./assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="./index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./docs/getting-started.html">Docs</a>
+      <a class="nav-docs" href="./docs/features.html">Features</a>
+      <a class="nav-docs" href="./docs/runtime.html">Runtime</a>
+      <a class="nav-docs" href="./docs/architecture.html">Architecture</a>
+      <a class="nav-docs" href="./docs/comparison-devcontainer.html">Compare</a>
+      <a class="nav-lang" href="./zh.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <div class="hero-orb" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Go CLI · MIT licensed · no daemon</p>
+          <h1>Give every agent its own berth</h1>
+          <p class="lede">Isolated local workspaces for parallel agent programming: one Git worktree, a private data directory, reserved ports and supervised processes per task — in milliseconds, without a VM.</p>
+        </div>
+
+        <div>
+          <p class="hero-shot-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>
+            Animated screencast · init → new → run → done
+          </p>
+          <div class="terminal">
+            <img src="https://cdn.jwjbox.dev/berth-demo.gif" width="780" height="460" alt="Terminal screencast: berth init, berth new with --up, berth run and berth done in a Git repository.">
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <div class="cmd">
+          <span class="cmd-prompt" aria-hidden="true">$</span>
+          <code>go install github.com/Mrjwj34/berth/cmd/berth@latest</code>
+          <button class="copy" type="button" hidden data-copy="go install github.com/Mrjwj34/berth/cmd/berth@latest" aria-label="Copy the go install command">Copy</button>
+        </div>
+        <a class="btn btn-primary" href="https://github.com/Mrjwj34/berth">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+      <ul class="chips">
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M9 20.5h6M12 17.5v3"/></svg>
+          Linux · macOS · Windows
+        </li>
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"/><path d="M3 12.5 12 17l9-4.5M3 17 12 21.5 21 17"/></svg>
+          Native + container
+        </li>
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+          Millisecond operations
+        </li>
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/></svg>
+          No background daemon
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">How it works</p>
+        <h2>Two agents, two berths, zero shared state</h2>
+        <p>Every workspace owns its checkout, its data, its ports and its processes. Values below are illustrative — allocations are made per workspace.</p>
+      </div>
+
+      <div class="panels">
+        <article class="panel" data-reveal>
+          <p class="panel-tag">01 · your repo</p>
+          <h3>One repository</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><path d="M6 8.5v7"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 18h6a3 3 0 0 0 3-3V9"/><circle cx="17.5" cy="6.5" r="2.5"/></svg>main checkout</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/></svg>shared .git objects</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14"/></svg>nothing else shared</li>
+          </ul>
+        </article>
+
+        <article class="panel" data-reveal>
+          <p class="panel-tag">02 · agent A</p>
+          <h3>berth new auth --up</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M9 18v3M15 18v3"/></svg>worktree berth/auth</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/></svg>data .berth/data</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 4v4M14 4v4"/><path d="M7 8h10v4a5 5 0 0 1-10 0V8Z"/></svg>BERTH_PORT_WEB=20001</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>web, pg supervised</li>
+          </ul>
+        </article>
+
+        <article class="panel" data-reveal>
+          <p class="panel-tag">03 · agent B</p>
+          <h3>berth new payments --up</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M9 18v3M15 18v3"/></svg>worktree berth/payments</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/></svg>data .berth/data</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 4v4M14 4v4"/><path d="M7 8h10v4a5 5 0 0 1-10 0V8Z"/></svg>BERTH_PORT_WEB=20003</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>web, pg supervised</li>
+          </ul>
+        </article>
+
+        <article class="panel" data-reveal>
+          <p class="panel-tag">04 · when pushed</p>
+          <h3>berth done auth</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>commits preserved</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>runtime stopped</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>checkout released</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>ports returned</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="code mt-6 measure-sm" data-reveal>
+        <button class="copy" type="button" hidden data-copy="berth init &amp;&amp; berth hook install all
+berth new feature-a --up
+berth run -- npm test
+berth done feature-a" aria-label="Copy the five-command quick start">Copy</button>
+        <pre><code>berth init &amp;&amp; berth hook install all
+berth new feature-a --up
+berth run -- npm test
+berth done feature-a</code></pre>
+      </div>
+      <p class="quote-line" data-reveal>Four commands from an empty repository to a running, isolated workspace. <a href="./docs/getting-started.html">Full walkthrough →</a></p>
+    </div>
+  </section>
+
+  <section class="section section--band" id="comparison">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">The boundary</p>
+        <h2>Workspace isolation, not machine isolation</h2>
+        <p>Raw worktrees manage file trees. OS containers manage everything, at the cost of a boot. berth draws the line at the workspace.</p>
+      </div>
+
+      <div class="table-wrap" data-reveal>
+        <table class="table">
+          <caption>Design axis comparison — expanded in the three comparison pages below.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Design axis</th>
+              <th scope="col" class="col-accent">berth</th>
+              <th scope="col">Raw git worktree</th>
+              <th scope="col">devcontainer / Docker</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Isolation boundary</th>
+              <td class="col-accent" data-label="berth">The workspace: worktree, private data, reserved ports, one process graph</td>
+              <td data-label="Raw git worktree">File tree and branch only</td>
+              <td data-label="devcontainer / Docker">The whole operating system, per session</td>
+            </tr>
+            <tr>
+              <th scope="row">Startup cost</th>
+              <td class="col-accent" data-label="berth">Milliseconds of registry work; native mode starts host processes directly</td>
+              <td data-label="Raw git worktree">One <code>git worktree add</code></td>
+              <td data-label="devcontainer / Docker">Image build or pull, container create, then mounts</td>
+            </tr>
+            <tr>
+              <th scope="row">Port allocation</th>
+              <td class="col-accent" data-label="berth">Named ports reserved atomically with the workspace record, injected as <code>BERTH_PORT_*</code></td>
+              <td data-label="Raw git worktree">Manual per checkout — and easy to commit by accident</td>
+              <td data-label="devcontainer / Docker">Explicit host mappings you keep unique yourself</td>
+            </tr>
+            <tr>
+              <th scope="row">Data isolation</th>
+              <td class="col-accent" data-label="berth">Private <code>.berth/data</code> per workspace; dependency trees copied copy-on-write</td>
+              <td data-label="Raw git worktree">Gitignored files, databases and caches are shared</td>
+              <td data-label="devcontainer / Docker">Separate filesystem; bind-mounted sources stay shared</td>
+            </tr>
+            <tr>
+              <th scope="row">Process supervision</th>
+              <td class="col-accent" data-label="berth"><code>up</code>, <code>down</code>, <code>logs</code>, <code>status</code> over a declared process graph with readiness probes</td>
+              <td data-label="Raw git worktree">Background shells and remembered PIDs</td>
+              <td data-label="devcontainer / Docker">Container lifecycle; services are yours to supervise</td>
+            </tr>
+            <tr>
+              <th scope="row">Host filesystem speed</th>
+              <td class="col-accent" data-label="berth">Native speed by default; container mode keeps the checkout on a bind mount</td>
+              <td data-label="Raw git worktree">Native speed</td>
+              <td data-label="devcontainer / Docker">Bind-mount penalty on macOS and Windows</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid grid-3 mt-6">
+        <article class="card card--plain" data-reveal>
+          <h3><a class="link-more" href="./docs/comparison-git-worktree.html">vs raw git worktree →</a></h3>
+          <p>What Git already gives you, and the four things it leaves to you.</p>
+        </article>
+        <article class="card card--plain" data-reveal>
+          <h3><a class="link-more" href="./docs/comparison-devcontainer.html">vs devcontainer / Docker →</a></h3>
+          <p>When the OS boundary is right, and what it costs per environment.</p>
+        </article>
+        <article class="card card--plain" data-reveal>
+          <h3><a class="link-more" href="./docs/comparison-agents.html">vs orchestration tools →</a></h3>
+          <p>A session layer needs a runtime underneath. berth is that layer.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">What a workspace owns</p>
+        <h2>Six things, declared once</h2>
+        <p>All of it lives in <code>berth.yaml</code>, committed with the repository and applied per workspace.</p>
+      </div>
+
+      <div class="grid grid-6">
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="6" r="2.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="12" r="2.5"/><path d="M6.5 8.5v7M6.5 12h8.5"/></svg>
+          </span>
+          <h3>One worktree per task</h3>
+          <p><code>berth new &lt;slug&gt;</code> creates <code>&lt;repo&gt;.berths/&lt;slug&gt;</code> on branch <code>berth/&lt;slug&gt;</code>, so two agents never edit one checkout.</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 4v4M14 4v4"/><path d="M7 8h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V8Z"/><path d="M12 17v3"/></svg>
+          </span>
+          <h3>Atomic port reservation</h3>
+          <p>Ports are reserved in the same cross-process transaction that registers the workspace, and stay stable for its lifetime.</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/><path d="M4 12c0 1.1 3.58 2 8 2s8-.9 8-2"/></svg>
+          </span>
+          <h3>Private data directory</h3>
+          <p><code>$BERTH_DATA_DIR</code> holds the databases, caches and fixtures; <code>copy_dirs</code> clones dependency trees with copy-on-write.</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>
+          </span>
+          <h3>Supervised processes</h3>
+          <p>The declared process graph runs in the workspace runtime; <code>up</code> waits on readiness probes and <code>status --json</code> tells you the truth.</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+          </span>
+          <h3>No daemon to run</h3>
+          <p>File locks plus one registry file. Separate workspaces proceed concurrently; commands inside one workspace serialize.</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"/><path d="M3 12.5 12 17l9-4.5M3 17 12 21.5 21 17"/></svg>
+          </span>
+          <h3>Native fast, container when needed</h3>
+          <p>Native mode runs host processes with zero virtualization. Container mode reuses one prepared Linux image per workspace — never a per-command build.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--band" id="agents">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">Works with your agent</p>
+        <h2>One skill, every harness</h2>
+        <p>berth is a plain CLI, so any agent that can run shell commands can drive it. One skill installs into the shared <code>.agents/skills</code> convention.</p>
+      </div>
+
+      <div class="agents" data-reveal>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">C</span>Cursor</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">&gt;_</span>Codex</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">GH</span>GitHub Copilot</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">G</span>Gemini CLI</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">o</span>opencode</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">W</span>Windsurf</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">K</span>Kilo Code</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">Z</span>Zed</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">J</span>JetBrains Junie</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">A</span>Antigravity</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">π</span>pi</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">$</span>Any CLI agent</span>
+      </div>
+
+      <p class="quote-line" data-reveal>Claude Code and Cline read only their own skill directory, so <code>berth skill install --agent claude,cline</code> writes a copy there too. Run <code>berth agents</code> to see what is installed. <a href="./docs/features.html#agents">Agent integration →</a></p>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">FAQ</p>
+        <h2>Short answers</h2>
+        <p>Operational detail lives in the documentation; these are the questions people ask first.</p>
+      </div>
+
+      <div class="faq" data-reveal>
+        <details>
+          <summary>Can two Claude Code sessions work on the same repository at the same time?</summary>
+          <p>Yes — that is the case berth is built for. Each session gets its own workspace: a linked worktree on its own branch, a private data directory, its own reserved ports and its own supervised processes. They share Git objects and nothing else that matters.</p>
+          <p>Create one per agent with <code>berth new &lt;slug&gt; --up</code> and let each session work from the path it prints.</p>
+        </details>
+
+        <details>
+          <summary>How do I give each agent its own port?</summary>
+          <p>Declare the ports once in <code>berth.yaml</code> — <code>ports: [web, pg]</code> — and every workspace reserves unique host ports for those names. The service binds <code>BERTH_PORT_WEB</code>; browser code and host tools use <code>BERTH_HOST_PORT_WEB</code>. Nothing is hardcoded, so nothing local can be committed by accident.</p>
+        </details>
+
+        <details>
+          <summary>Why not just use devcontainer?</summary>
+          <p>If you need OS-level isolation, a uniform Linux toolchain or CI parity, use the container — berth is not a replacement for that, and container mode is not an attempt to be one.</p>
+          <p>berth isolates the workspace instead: native by default, with ports, data and environment separated by construction. Reach for its container backend when a program hardcodes a listen port or the toolchain is Linux-only.</p>
+        </details>
+
+        <details>
+          <summary>Does berth need a daemon?</summary>
+          <p>No. There is no background service and no socket to keep alive: file locks plus a single registry file (<code>~/.berth/state.json</code>, relocatable with <code>BERTH_HOME</code>). Long operations hold their own workspace lock, and supervision is delegated to process-compose or the container engine.</p>
+        </details>
+
+        <details>
+          <summary>What happens to my data when I clean up a workspace?</summary>
+          <p><code>berth down</code> keeps everything and stops the processes. <code>berth reset</code> wipes the private data directory deliberately. <code>berth done</code> requires the branch commit to be preserved and the worktree to be clean, then removes the checkout — <code>--force</code> cannot bypass ownership, identity or shutdown checks, and adopted checkouts are always preserved.</p>
+        </details>
+
+        <details>
+          <summary>Does it work on Windows and macOS?</summary>
+          <p>Yes: prebuilt binaries for Linux, macOS and Windows, with native CLI acceptance covered on all three in CI. Native hooks use <code>sh</code> on Unix and <code>cmd</code> on Windows, so shell scripts are not interchangeable; container mode needs an existing Docker or Podman engine.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>Fast, low-cost management of parallel development environments. One workspace per task: worktree, data, ports and processes.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          <li><a href="./docs/getting-started.html">Getting started</a></li>
+          <li><a href="./docs/features.html">Features &amp; configuration</a></li>
+          <li><a href="./docs/runtime.html">Runtime contract</a></li>
+          <li><a href="./docs/architecture.html">Architecture</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Comparisons</h2>
+        <ul>
+          <li><a href="./docs/comparison-git-worktree.html">vs raw git worktree</a></li>
+          <li><a href="./docs/comparison-devcontainer.html">vs devcontainer / Docker</a></li>
+          <li><a href="./docs/comparison-agents.html">vs orchestration tools</a></li>
+          <li><a href="./zh.html" hreflang="zh-CN" lang="zh-CN">中文文档</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub repository</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">Releases</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">Issues</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT licensed · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth is a local workspace manager, not a security sandbox.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Copy-to-clipboard: buttons stay hidden when scripting is unavailable.
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* copy stays manual */ }
+    document.body.removeChild(area);
+  }
+
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+
+  // Horizontal table scrolling only gets a hint when it is actually possible.
+  function syncTableHints() {
+    var wraps = document.querySelectorAll('.table-wrap');
+    for (var k = 0; k < wraps.length; k++) {
+      var wrap = wraps[k];
+      var overflow = wrap.scrollWidth - wrap.clientWidth > 2;
+      var next = wrap.nextElementSibling;
+      var hasHint = next && next.classList && next.classList.contains('table-hint');
+      if (overflow && !hasHint) {
+        var hint = document.createElement('p');
+        hint.className = 'table-hint';
+        hint.textContent = 'Swipe horizontally to see every column';
+        wrap.parentNode.insertBefore(hint, wrap.nextSibling);
+      } else if (!overflow && hasHint) {
+        next.parentNode.removeChild(next);
+      }
+    }
+  }
+
+  window.addEventListener('load', syncTableHints);
+  window.addEventListener('resize', syncTableHints);
+
+  // Scroll-triggered section reveals; ignored entirely when motion is reduced.
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var targets = document.querySelectorAll('[data-reveal]');
+  if (!reduced && 'IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      for (var e = 0; e < entries.length; e++) {
+        if (entries[e].isIntersecting) {
+          entries[e].target.classList.add('is-visible');
+          observer.unobserve(entries[e].target);
+        }
+      }
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    for (i = 0; i < targets.length; i++) {
+      targets[i].classList.add('reveal');
+      observer.observe(targets[i]);
+    }
+  }
+})();
+</script>
+</body>
+</html>

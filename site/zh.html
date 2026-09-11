@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>berth — 为并行编程 Agent 提供隔离的本地工作区</title>
+<meta name="description" content="berth 是一个采用 MIT 协议的 Go 命令行工具：为每个编程 Agent 提供专属的 Git worktree、私有数据目录、独立预留端口与受管进程，毫秒级拉起本地开发环境，无需常驻守护进程，也没有虚拟机开销。">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/zh.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="berth — 为并行编程 Agent 提供隔离的本地工作区">
+<meta property="og:description" content="每个任务独立拥有 linked worktree、私有数据目录、原子预留端口与受管进程。无需守护进程，没有虚拟机开销。">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/zh.html">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth 架构图">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="./assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="./index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="./docs/getting-started.html">文档</a>
+      <a class="nav-docs" href="./docs/features.html">功能</a>
+      <a class="nav-docs" href="./docs/runtime.html">运行时</a>
+      <a class="nav-docs" href="./docs/architecture.html">架构</a>
+      <a class="nav-docs" href="./docs/comparison-devcontainer.html">对比</a>
+      <a class="nav-lang" href="./index.html" hreflang="en" lang="en">English</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <div class="hero-orb" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Go 命令行工具 · MIT 协议 · 无守护进程</p>
+          <h1>给每个 Agent 一个专属泊位</h1>
+          <p class="lede">为并行编程 Agent 准备隔离的本地工作区：每个任务拥有独立的 Git worktree、私有数据目录、预留端口与受管进程——毫秒级完成，不需要虚拟机。</p>
+        </div>
+
+        <div>
+          <p class="hero-shot-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>
+            动画演示 · init → new → run → done
+          </p>
+          <div class="terminal">
+            <img src="https://cdn.jwjbox.dev/berth-demo.gif" width="780" height="460" alt="终端演示：在 Git 仓库中依次执行 berth init、berth new --up、berth run 与 berth done。">
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <div class="cmd">
+          <span class="cmd-prompt" aria-hidden="true">$</span>
+          <code>go install github.com/Mrjwj34/berth/cmd/berth@latest</code>
+          <button class="copy" type="button" hidden data-copy="go install github.com/Mrjwj34/berth/cmd/berth@latest" aria-label="复制 go install 命令">复制</button>
+        </div>
+        <a class="btn btn-primary" href="https://github.com/Mrjwj34/berth">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          前往 GitHub
+        </a>
+      </div>
+      <ul class="chips">
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M9 20.5h6M12 17.5v3"/></svg>
+          Linux · macOS · Windows
+        </li>
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"/><path d="M3 12.5 12 17l9-4.5M3 17 12 21.5 21 17"/></svg>
+          原生 + 容器
+        </li>
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+          毫秒级操作
+        </li>
+        <li class="chip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/></svg>
+          无后台守护进程
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">工作方式</p>
+        <h2>两个 Agent，两个泊位，互不共享</h2>
+        <p>每个工作区独占自己的 checkout、数据、端口与进程。下列数值仅作示意，实际分配按工作区进行。</p>
+      </div>
+
+      <div class="panels">
+        <article class="panel" data-reveal>
+          <p class="panel-tag">01 · 你的仓库</p>
+          <h3>一个仓库</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><path d="M6 8.5v7"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 18h6a3 3 0 0 0 3-3V9"/><circle cx="17.5" cy="6.5" r="2.5"/></svg>main 主检出</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/></svg>共享 .git 对象</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14"/></svg>其余不共享</li>
+          </ul>
+        </article>
+
+        <article class="panel" data-reveal>
+          <p class="panel-tag">02 · Agent A</p>
+          <h3>berth new auth --up</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M9 18v3M15 18v3"/></svg>worktree berth/auth</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/></svg>数据 .berth/data</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 4v4M14 4v4"/><path d="M7 8h10v4a5 5 0 0 1-10 0V8Z"/></svg>BERTH_PORT_WEB=20001</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>web、pg 受管</li>
+          </ul>
+        </article>
+
+        <article class="panel" data-reveal>
+          <p class="panel-tag">03 · Agent B</p>
+          <h3>berth new payments --up</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M9 18v3M15 18v3"/></svg>worktree berth/payments</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/></svg>数据 .berth/data</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 4v4M14 4v4"/><path d="M7 8h10v4a5 5 0 0 1-10 0V8Z"/></svg>BERTH_PORT_WEB=20003</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>web、pg 受管</li>
+          </ul>
+        </article>
+
+        <article class="panel" data-reveal>
+          <p class="panel-tag">04 · 推送之后</p>
+          <h3>berth done auth</h3>
+          <ul class="panel-list">
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>提交已保存</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>运行时已停止</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>checkout 已释放</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>端口已归还</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="code mt-6 measure-sm" data-reveal>
+        <button class="copy" type="button" hidden data-copy="berth init &amp;&amp; berth hook install all
+berth new feature-a --up
+berth run -- npm test
+berth done feature-a" aria-label="复制五步快速开始命令">复制</button>
+        <pre><code>berth init &amp;&amp; berth hook install all
+berth new feature-a --up
+berth run -- npm test
+berth done feature-a</code></pre>
+      </div>
+      <p class="quote-line" data-reveal>四条命令，从空仓库到正在运行的隔离工作区。<a href="./docs/getting-started.html">完整上手文档 →</a></p>
+    </div>
+  </section>
+
+  <section class="section section--band" id="comparison">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">隔离边界</p>
+        <h2>隔离工作区，而不是隔离整台机器</h2>
+        <p>纯 worktree 只管文件树；系统容器什么都能管，代价是每个环境都要启动一次。berth 把边界画在工作区上。</p>
+      </div>
+
+      <div class="table-wrap" data-reveal>
+        <table class="table">
+          <caption>设计维度对比——每一行的展开说明见下方三个对比页面。</caption>
+          <thead>
+            <tr>
+              <th scope="col">设计维度</th>
+              <th scope="col" class="col-accent">berth</th>
+              <th scope="col">纯 git worktree</th>
+              <th scope="col">devcontainer / Docker</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">隔离边界</th>
+              <td class="col-accent" data-label="berth">工作区：worktree、私有数据、预留端口与一套进程图</td>
+              <td data-label="纯 git worktree">仅文件树与分支</td>
+              <td data-label="devcontainer / Docker">整个操作系统，按会话划分</td>
+            </tr>
+            <tr>
+              <th scope="row">启动开销</th>
+              <td class="col-accent" data-label="berth">毫秒级注册表操作；原生模式直接启动宿主机进程</td>
+              <td data-label="纯 git worktree">一次 <code>git worktree add</code></td>
+              <td data-label="devcontainer / Docker">构建或拉取镜像、创建容器、挂载目录</td>
+            </tr>
+            <tr>
+              <th scope="row">端口分配</th>
+              <td class="col-accent" data-label="berth">命名端口与工作区记录原子预留，以 <code>BERTH_PORT_*</code> 注入</td>
+              <td data-label="纯 git worktree">手工逐个 checkout 改端口，极易误提交</td>
+              <td data-label="devcontainer / Docker">显式映射到宿主端口，需自行保证不重复</td>
+            </tr>
+            <tr>
+              <th scope="row">数据隔离</th>
+              <td class="col-accent" data-label="berth">每个工作区独立的 <code>.berth/data</code>；依赖目录以写时复制克隆</td>
+              <td data-label="纯 git worktree">被 gitignore 的文件、数据库与缓存共享</td>
+              <td data-label="devcontainer / Docker">容器文件系统独立，bind mount 的源码仍共享</td>
+            </tr>
+            <tr>
+              <th scope="row">进程管理</th>
+              <td class="col-accent" data-label="berth"><code>up</code>、<code>down</code>、<code>logs</code>、<code>status</code> 管理声明式进程图，带就绪探针</td>
+              <td data-label="纯 git worktree">后台 shell 和记在脑子里的 PID</td>
+              <td data-label="devcontainer / Docker">容器生命周期可用，服务编排仍需自己实现</td>
+            </tr>
+            <tr>
+              <th scope="row">宿主文件系统速度</th>
+              <td class="col-accent" data-label="berth">默认即宿主速度；容器模式 checkout 走 bind mount</td>
+              <td data-label="纯 git worktree">宿主速度</td>
+              <td data-label="devcontainer / Docker">macOS 与 Windows 上有 bind mount 性能损耗</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid grid-3 mt-6">
+        <article class="card card--plain" data-reveal>
+          <h3><a class="link-more" href="./docs/comparison-git-worktree.html">对比纯 git worktree →</a></h3>
+          <p>Git 已经给了你什么，以及它留给你的四件事。</p>
+        </article>
+        <article class="card card--plain" data-reveal>
+          <h3><a class="link-more" href="./docs/comparison-devcontainer.html">对比 devcontainer / Docker →</a></h3>
+          <p>什么时候系统边界是对的，以及每个环境的代价。</p>
+        </article>
+        <article class="card card--plain" data-reveal>
+          <h3><a class="link-more" href="./docs/comparison-agents.html">对比编排工具 →</a></h3>
+          <p>会话编排层下面仍然需要一个运行时。berth 就是这一层。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">一个工作区拥有什么</p>
+        <h2>六件事，声明一次</h2>
+        <p>全部写在 <code>berth.yaml</code> 中，随仓库提交，按工作区逐一应用。</p>
+      </div>
+
+      <div class="grid grid-6">
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="6" r="2.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="12" r="2.5"/><path d="M6.5 8.5v7M6.5 12h8.5"/></svg>
+          </span>
+          <h3>每个任务独立 worktree</h3>
+          <p><code>berth new &lt;slug&gt;</code> 在 <code>&lt;repo&gt;.berths/&lt;slug&gt;</code> 创建分支 <code>berth/&lt;slug&gt;</code>，两个 Agent 永远不会编辑同一个 checkout。</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 4v4M14 4v4"/><path d="M7 8h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V8Z"/><path d="M12 17v3"/></svg>
+          </span>
+          <h3>原子端口预留</h3>
+          <p>端口与工作区记录在同一次跨进程事务中预留，并在工作区生命周期内保持稳定。</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7c0-1.1 3.58-2 8-2s8 .9 8 2-3.58 2-8 2-8-.9-8-2Z"/><path d="M4 7v10c0 1.1 3.58 2 8 2s8-.9 8-2V7"/><path d="M4 12c0 1.1 3.58 2 8 2s8-.9 8-2"/></svg>
+          </span>
+          <h3>私有数据目录</h3>
+          <p><code>$BERTH_DATA_DIR</code> 存放数据库、缓存与测试数据；<code>copy_dirs</code> 以写时复制克隆依赖目录。</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>
+          </span>
+          <h3>受管进程</h3>
+          <p>声明的进程图在工作区运行时中受管；<code>up</code> 等待就绪探针，<code>status --json</code> 直接给出真实状态。</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+          </span>
+          <h3>不需要守护进程</h3>
+          <p>只有文件锁和一份注册表。不同工作区可以并发推进，同一工作区内的命令串行执行。</p>
+        </article>
+
+        <article class="card" data-reveal>
+          <span class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"/><path d="M3 12.5 12 17l9-4.5M3 17 12 21.5 21 17"/></svg>
+          </span>
+          <h3>原生为主，容器可选</h3>
+          <p>原生模式直接运行宿主机进程，零虚拟化开销；容器模式为每个工作区复用一个预先构建的镜像，绝不按命令重建。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--band" id="agents">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">适配你的 Agent</p>
+        <h2>一份技能，适配所有 harness</h2>
+        <p>berth 就是普通命令行工具：任何能执行 shell 命令的 Agent 都能驱动它，一份技能安装到共享的 <code>.agents/skills</code> 约定目录即可。</p>
+      </div>
+
+      <div class="agents" data-reveal>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">C</span>Cursor</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">&gt;_</span>Codex</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">GH</span>GitHub Copilot</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">G</span>Gemini CLI</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">o</span>opencode</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">W</span>Windsurf</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">K</span>Kilo Code</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">Z</span>Zed</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">J</span>JetBrains Junie</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">A</span>Antigravity</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">π</span>pi</span>
+        <span class="agent"><span class="agent-mark" aria-hidden="true">$</span>任意命令行 Agent</span>
+      </div>
+
+      <p class="quote-line" data-reveal>Claude Code 与 Cline 只读各自的技能目录，因此可用 <code>berth skill install --agent claude,cline</code> 额外写入一份副本。运行 <code>berth agents</code> 查看当前仓库已安装的内容。<a href="./docs/features.html#agents">Agent 集成说明 →</a></p>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
+    <div class="wrap">
+      <div class="section-head" data-reveal>
+        <p class="eyebrow">常见问题</p>
+        <h2>简短回答</h2>
+        <p>运行细节都在文档中；这里是最先会被问到的几个问题。</p>
+      </div>
+
+      <div class="faq" data-reveal>
+        <details>
+          <summary>两个 Claude Code 会话能同时修改同一个仓库吗？</summary>
+          <p>可以，这正是 berth 要解决的场景。每个会话拥有自己的工作区：独立分支上的链接工作树、私有数据目录、独立预留的端口，以及自己的一套受管进程；它们只共享 Git 对象。</p>
+          <p>用 <code>berth new &lt;slug&gt; --up</code> 为每个 Agent 准备一个工作区，让它直接在命令输出的路径里工作。</p>
+        </details>
+
+        <details>
+          <summary>怎么给每个 Agent 分配独立的端口？</summary>
+          <p>只需在 <code>berth.yaml</code> 中声明一次，例如 <code>ports: [web, pg]</code>，每个工作区都会为这些名字预留唯一宿主端口。服务绑定 <code>BERTH_PORT_WEB</code>，浏览器与宿主工具使用 <code>BERTH_HOST_PORT_WEB</code>；没有任何硬编码，也就不会误提交。</p>
+        </details>
+
+        <details>
+          <summary>为什么不直接使用 devcontainer？</summary>
+          <p>如果你需要系统级隔离、统一的 Linux 工具链或与 CI 一致的环境，请使用容器——berth 不替代它，其容器模式也不打算成为它。</p>
+          <p>berth 隔离的是工作区：默认原生运行，端口、数据与环境变量由构造隔离。只有当程序硬编码监听端口或工具链仅限 Linux 时，才需要启用容器后端。</p>
+        </details>
+
+        <details>
+          <summary>berth 需要常驻守护进程吗？</summary>
+          <p>不需要。没有后台服务，也没有需要维持的套接字：只有文件锁和一份注册表文件（<code>~/.berth/state.json</code>，可用 <code>BERTH_HOME</code> 改址）。长时间操作只持有自身工作区的锁，进程监管交给 process-compose 或容器引擎。</p>
+        </details>
+
+        <details>
+          <summary>清理工作区时我的数据会怎样？</summary>
+          <p><code>berth down</code> 保留全部内容，只停止进程；<code>berth reset</code> 按明确意图清空私有数据目录；<code>berth done</code> 要求分支提交已保存且工作树干净，然后移除 checkout——<code>--force</code> 无法绕过归属、身份与停机校验，被 adopt 的 checkout 永远保留。</p>
+        </details>
+
+        <details>
+          <summary>支持 Windows 和 macOS 吗？</summary>
+          <p>支持：为 Linux、macOS、Windows 提供预编译二进制，三个系统的原生命令行验收都在 CI 覆盖范围内。原生钩子在 Unix 上使用 <code>sh</code>、在 Windows 上使用 <code>cmd</code>，脚本并不通用；容器模式需要本机已安装 Docker 或 Podman。</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>快速、低成本地管理并行开发环境。每个任务一个工作区：worktree、数据、端口与进程都归它独有。</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>文档</h2>
+        <ul>
+          <li><a href="./docs/getting-started.html">快速开始</a></li>
+          <li><a href="./docs/features.html">功能与配置</a></li>
+          <li><a href="./docs/runtime.html">运行时契约</a></li>
+          <li><a href="./docs/architecture.html">架构设计</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>对比</h2>
+        <ul>
+          <li><a href="./docs/comparison-git-worktree.html">对比纯 git worktree</a></li>
+          <li><a href="./docs/comparison-devcontainer.html">对比 devcontainer / Docker</a></li>
+          <li><a href="./docs/comparison-agents.html">对比编排工具</a></li>
+          <li><a href="./index.html" hreflang="en" lang="en">English site</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>项目</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub 仓库</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">版本发布</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">问题反馈</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT 协议</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT 协议 · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth 是本地工作区管理器，不是安全沙箱。</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = '已复制';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* 保留手动复制 */ }
+    document.body.removeChild(area);
+  }
+
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+
+  function syncTableHints() {
+    var wraps = document.querySelectorAll('.table-wrap');
+    for (var k = 0; k < wraps.length; k++) {
+      var wrap = wraps[k];
+      var overflow = wrap.scrollWidth - wrap.clientWidth > 2;
+      var next = wrap.nextElementSibling;
+      var hasHint = next && next.classList && next.classList.contains('table-hint');
+      if (overflow && !hasHint) {
+        var hint = document.createElement('p');
+        hint.className = 'table-hint';
+        hint.textContent = '可横向滑动查看全部列';
+        wrap.parentNode.insertBefore(hint, wrap.nextSibling);
+      } else if (!overflow && hasHint) {
+        next.parentNode.removeChild(next);
+      }
+    }
+  }
+
+  window.addEventListener('load', syncTableHints);
+  window.addEventListener('resize', syncTableHints);
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var targets = document.querySelectorAll('[data-reveal]');
+  if (!reduced && 'IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      for (var e = 0; e < entries.length; e++) {
+        if (entries[e].isIntersecting) {
+          entries[e].target.classList.add('is-visible');
+          observer.unobserve(entries[e].target);
+        }
+      }
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    for (i = 0; i < targets.length; i++) {
+      targets[i].classList.add('reveal');
+      observer.observe(targets[i]);
+    }
+  }
+})();
+</script>
+</body>
+</html>

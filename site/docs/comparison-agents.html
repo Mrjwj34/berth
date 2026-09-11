@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>berth vs parallel-agent tooling — berth documentation</title>
+<meta name="description" content="Session orchestration tools and berth operate at different layers: a design-axis comparison of checkout ownership, ports, data, supervision and scripting between them.">
+<link rel="canonical" href="https://mrjwj34.github.io/berth/docs/comparison-agents.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f52bd'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='6.5' y='14' width='5' height='9' rx='2.5' opacity='.7'/%3E%3Crect x='13.5' y='8' width='5' height='15' rx='2.5'/%3E%3Crect x='20.5' y='12' width='5' height='11' rx='2.5' opacity='.85'/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="berth">
+<meta property="og:title" content="berth vs parallel-agent tooling — berth documentation">
+<meta property="og:description" content="Session orchestration and workspace runtime are different layers. What a session layer owns, what still has to exist underneath it, and how a checkout berth did not create can be brought under management.">
+<meta property="og:url" content="https://mrjwj34.github.io/berth/docs/comparison-agents.html">
+<meta property="og:image" content="https://cdn.jwjbox.dev/berth-architecture.png">
+<meta property="og:image:width" content="1448">
+<meta property="og:image:height" content="1086">
+<meta property="og:image:alt" content="berth architecture diagram">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101419" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="9.5" width="4.4" height="9" rx="2.2" fill="currentColor" opacity=".55"/>
+        <rect x="9.8" y="4" width="4.4" height="14.5" rx="2.2" fill="currentColor"/>
+        <rect x="16.6" y="7.5" width="4.4" height="11" rx="2.2" fill="currentColor" opacity=".75"/>
+        <rect x="3" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="9.8" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+        <rect x="16.6" y="20.4" width="4.4" height="1.4" rx=".7" fill="currentColor" opacity=".35"/>
+      </svg>
+      <span>berth</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./getting-started.html">Docs</a>
+      <a class="nav-docs" href="./features.html">Features</a>
+      <a class="nav-docs" href="./runtime.html">Runtime</a>
+      <a class="nav-docs" href="./architecture.html">Architecture</a>
+      <a class="nav-docs" href="./comparison-devcontainer.html">Compare</a>
+      <a class="nav-lang" href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+      <a class="nav-github" href="https://github.com/Mrjwj34/berth">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <nav class="subnav" aria-label="Documentation">
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./features.html">Features &amp; configuration</a>
+      <a href="./runtime.html">Runtime contract</a>
+      <a href="./architecture.html">Architecture</a>
+      <a href="./comparison-git-worktree.html">vs git worktree</a>
+      <a href="./comparison-devcontainer.html">vs devcontainer</a>
+      <a href="./comparison-agents.html" aria-current="page">vs agent tools</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <p class="crumbs"><a href="../index.html">berth</a> / Documentation / berth vs parallel-agent tooling</p>
+      <h1>berth vs parallel-agent tooling</h1>
+      <p>Conductor, Crystal, vibe-kanban and tools like them organise agent sessions; berth provisions the workspace a session runs in. This page compares design intent and layers, not implementations, and it makes no claims about the internals of any named tool.</p>
+    </header>
+
+    <article class="prose">
+      <p>Start with the framing, because the comparison only makes sense inside it. These tools and berth operate at different layers of the same stack, so the useful question is not which one wins but which layer is missing on your machine. Nothing here describes how Conductor, Crystal, vibe-kanban or any other product is built; this page compares the design intent of a session-orchestration layer with the design intent of a workspace runtime, and every berth statement below is drawn from berth's own published documentation.</p>
+
+      <h2 id="axes">The axes</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <caption>Design-axis comparison. The second column describes the axis an orchestration layer has to answer — a design question at that layer — rather than a claim about any specific product.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Design axis</th>
+              <th scope="col" class="col-accent">berth</th>
+              <th scope="col">parallel-agent tooling</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Primary unit of work</th>
+              <td class="col-accent" data-label="berth">A workspace: one worktree, one branch, one private data directory, one reserved port set, one supervised process graph, addressable by slug</td>
+              <td data-label="parallel-agent tooling">A session or a task as the layer defines it. Whether that maps onto exactly one checkout, and who owns that checkout, is the question this row raises</td>
+            </tr>
+            <tr>
+              <th scope="row">Interface</th>
+              <td class="col-accent" data-label="berth">A CLI, with <code>--json</code> on every subcommand and an embedded agent skill that any harness able to run shell commands can read</td>
+              <td data-label="parallel-agent tooling">Typically a human-facing surface — a list of sessions, diffs, review affordances — which is the layer's job, not a defect</td>
+            </tr>
+            <tr>
+              <th scope="row">Where it runs</th>
+              <td class="col-accent" data-label="berth">On your machine, beside the repository: a local binary whose only hard dependency is Git</td>
+              <td data-label="parallel-agent tooling">Wherever the layer is installed. That is a product decision, and this page does not assume one</td>
+            </tr>
+            <tr>
+              <th scope="row">Who creates and owns the per-task checkout</th>
+              <td class="col-accent" data-label="berth">berth creates it (<code>berth new</code>) and owns it, or registers an existing linked worktree with <code>berth adopt</code>; an adopted checkout is never removed</td>
+              <td data-label="parallel-agent tooling">The axis to check first: whatever creates the checkout defines its removal policy, and everything underneath inherits that decision</td>
+            </tr>
+            <tr>
+              <th scope="row">Port and data handling</th>
+              <td class="col-accent" data-label="berth">Named ports reserved atomically with the workspace record and stable for its lifetime; private data in <code>$BERTH_DATA_DIR</code>; <code>copy_dirs</code> and <code>.worktreeinclude</code> seed dependencies and local files during setup</td>
+              <td data-label="parallel-agent tooling">Undefined until something defines it. Two sessions that both start the server their project hardcodes will collide whichever interface started them</td>
+            </tr>
+            <tr>
+              <th scope="row">Process supervision</th>
+              <td class="col-accent" data-label="berth">A declared process graph with readiness probes; <code>up</code>, <code>down</code>, <code>status</code> and <code>logs</code> per workspace; nothing depends on a window staying open</td>
+              <td data-label="parallel-agent tooling">The question every session layer has to answer: when the session ends, what stops the servers it started?</td>
+            </tr>
+            <tr>
+              <th scope="row">Host tooling and editor integration</th>
+              <td class="col-accent" data-label="berth">No editor of its own: <code>berth attach</code> prints the path, branch and shell exports, and <code>berth hook install</code> merges the Cursor worktree adapter</td>
+              <td data-label="parallel-agent tooling">Where a session layer earns its place — triage, review and human control gathered into one surface</td>
+            </tr>
+            <tr>
+              <th scope="row">Scripting and harness coverage</th>
+              <td class="col-accent" data-label="berth">Machine-readable output on every subcommand; the skill installs once into <code>.agents/skills/berth</code>, read by Cursor, Codex, pi and Antigravity, and berth writes nothing into a harness's own rules file</td>
+              <td data-label="parallel-agent tooling">The axis that varies most, and the one worth asking about: can the layer be driven without its own user interface?</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="two-layers">Two layers, not two competitors</h2>
+      <p>An orchestration layer sits on top of a human's attention: it shows many sessions at once, gives each one a place in a queue, and puts a review step between the agent finishing and the result being accepted. A workspace runtime sits underneath: it makes sure each of those sessions actually has a directory, a branch, a database it does not share, a port nobody else is using, processes that stop when the session is over, and a removal path that cannot delete work nobody preserved. Both layers are real work, and neither is a worse version of the other.</p>
+
+      <h2 id="what-a-session-layer-gives">What an orchestration layer gives you</h2>
+      <p>The category's job is triage and control. When five agents are running, a human needs to see which sessions are progressing, which are blocked, which are waiting for review, and what each one changed — and needs to be able to stop one, redirect one, or take over the diff before it lands. That is an interface problem more than a runtime problem, and it is where a graphical, session-oriented tool is genuinely the better answer: a terminal plus five background processes does not give a reviewer a queue, a diff view or a place to approve.</p>
+
+      <h2 id="what-has-to-exist-underneath">What still has to exist underneath</h2>
+      <p>Whichever layer you start sessions from, five things have to be true of the environment each session runs in, and none of them are solved by an interface: one real checkout per task, so two agents are not editing the same files; a port set that does not collide, so two dev servers can run at once; a data directory that does not corrupt, so two migrations are not applied to one database; supervised processes that stop when the task ends, instead of holding ports until the machine restarts; and a removal path that refuses to delete anything whose work was never preserved. Keep the review UI and the workspace runtime conceptually separate and it becomes obvious which one you are missing when something goes wrong.</p>
+
+      <h2 id="what-berth-provides">What berth provides at the workspace layer</h2>
+      <p>berth is deliberately the lower half. It is a CLI — no server, no daemon, no interface to keep open — whose primitives are exactly the five concerns above: <code>berth new</code> creates the checkout and reserves the ports, <code>berth run</code> executes a command in the same runtime and environment as the services, <code>berth status</code> reports readiness, <code>berth logs</code> shows a process, <code>berth down</code> stops the graph while keeping data, and <code>berth done</code> releases the workspace once the commit is preserved. Every subcommand takes <code>--json</code>, which is what makes berth scriptable from any harness rather than only from a person at a keyboard.</p>
+      <p>The agent-integration story follows the same principle: one skill, installed to <code>.agents/skills/berth</code> — the single location Cursor, Codex, pi and Antigravity all read — so any agent that can run shell commands can drive the workspace lifecycle without berth knowing anything about that harness. berth writes nothing into <code>AGENTS.md</code>, <code>GEMINI.md</code> or any harness's own rules file.</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="berth new feature-a --up        # checkout, reserved ports, supervised processes
+berth run -- npm test           # same runtime and environment as the services
+berth status --json             # readiness for scripts, not sleep loops
+berth down feature-a            # stop the graph, keep the data
+berth done feature-a            # release the workspace once the commit is preserved" aria-label="Copy the workspace primitives">Copy</button>
+        <pre><code>berth new feature-a --up        # checkout, reserved ports, supervised processes
+berth run -- npm test           # same runtime and environment as the services
+berth status --json             # readiness for scripts, not sleep loops
+berth down feature-a            # stop the graph, keep the data
+berth done feature-a            # release the workspace once the commit is preserved</code></pre>
+      </div>
+
+      <div class="note">
+        <p><strong>This page makes no claims about any named tool's internals.</strong> Conductor, Crystal and vibe-kanban are named here only to identify the category this page compares against — a session layer with a human-facing review surface. Whether a given tool has a headless mode, which harnesses it drives, or how it provisions directories is something to read in that tool's own documentation.</p>
+      </div>
+
+      <h2 id="what-berth-is-not">What berth deliberately is not</h2>
+      <p>berth has no GUI, no task board, no session queue and no human review UI, and it does not plan to grow them: an interface that shows many sessions is a different product with a different user. It also does not decide which agent runs, does not keep a conversation, and does not hold a queue of work. If you are looking for a place to watch six agents work, triage their output and approve diffs, berth is the wrong layer to evaluate — that is the session layer's job, and it is a real job.</p>
+
+      <h2 id="interop">Interoperability: checkouts you did not create</h2>
+      <p>The layers do not have to be chosen exclusively, because a harness that hands you a Git worktree berth has never seen can be brought under management in place. Run <code>berth adopt --setup</code> inside that checkout when it is on a branch: berth registers it, applies the ports, data directory and process graph the workspace needs, and records it as adopted — which means it will never be removed implicitly, and <code>berth done</code> on it stops and unregisters the runtime while preserving the checkout, the data and the branch even with <code>--force</code>. When the harness creates a <em>detached</em> worktree, or the task needs its own ports and data, <code>berth new</code> is the right call instead. The Cursor worktree adapter installed by <code>berth hook install</code> does exactly this: it runs <code>berth adopt --setup</code> inside every worktree Cursor creates, so sessions started from that editor land on managed ground without the agent having to remember to do it.</p>
+      <div class="code">
+        <button class="copy" type="button" hidden data-copy="cd /path/to/the/worktree/someone/else/created
+berth adopt --setup             # register it, apply ports, data and processes
+berth status --json             # inspect what it is now running
+
+berth init &amp;&amp; berth hook install all   # skill + Cursor worktree adapter" aria-label="Copy the adoption commands">Copy</button>
+        <pre><code>cd /path/to/the/worktree/someone/else/created
+berth adopt --setup             # register it, apply ports, data and processes
+berth status --json             # inspect what it is now running
+
+berth init &amp;&amp; berth hook install all   # skill + Cursor worktree adapter</code></pre>
+      </div>
+
+      <div class="note">
+        <p><strong>An adopted checkout is never deleted, even with <code>--force</code>.</strong> That is the correct default — berth did not create it, so it does not own its removal — but it also means that if your session layer created the worktree, cleaning it up afterwards is still that layer's responsibility.</p>
+      </div>
+
+      <h2 id="choose-the-layer">Choose the layer you are missing</h2>
+      <p>If you already have a session layer you like and your agents keep colliding over ports and databases, the missing piece is the workspace runtime underneath, and <code>berth adopt --setup</code> is the smallest step toward it. If you have berth and no way to see what four parallel sessions are doing, the missing piece is the session layer, and no amount of port allocation will substitute for a review queue. Run both if you need both: they share exactly one contract — a directory with a branch, a port set and a data directory — and berth's side of that contract is a CLI with JSON output, which is the least opinionated thing it could offer a layer above it.</p>
+
+      <nav class="page-nav" aria-label="Documentation pagination">
+        <a class="btn btn-ghost" href="./comparison-git-worktree.html">← berth vs raw git worktree</a>
+        <a class="btn btn-ghost" href="./comparison-devcontainer.html">berth vs devcontainer / Docker →</a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <img class="footer-logo" src="https://cdn.jwjbox.dev/berth.png" alt="berth" width="188" height="61">
+      <p>Fast, low-cost management of parallel development environments. One workspace per task: worktree, data, ports and processes.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          <li><a href="./getting-started.html">Getting started</a></li>
+          <li><a href="./features.html">Features &amp; configuration</a></li>
+          <li><a href="./runtime.html">Runtime contract</a></li>
+          <li><a href="./architecture.html">Architecture</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Comparisons</h2>
+        <ul>
+          <li><a href="./comparison-git-worktree.html">vs raw git worktree</a></li>
+          <li><a href="./comparison-devcontainer.html">vs devcontainer / Docker</a></li>
+          <li><a href="./comparison-agents.html">vs orchestration tools</a></li>
+          <li><a href="../zh.html" hreflang="zh-CN" lang="zh-CN">中文文档</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Mrjwj34/berth">GitHub repository</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/releases">Releases</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/issues">Issues</a></li>
+          <li><a href="https://github.com/Mrjwj34/berth/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="footer-legal">
+      <p>MIT licensed · Go 1.25+ · Linux · macOS · Windows</p>
+      <p>berth is a local workspace manager, not a security sandbox.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]');
+  var i;
+  for (i = 0; i < buttons.length; i++) { buttons[i].hidden = false; }
+  function confirm(btn) {
+    var label = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.setAttribute('data-copied', '');
+    window.setTimeout(function () {
+      btn.textContent = label;
+      btn.removeAttribute('data-copied');
+    }, 1600);
+  }
+  function legacy(text, btn) {
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); confirm(btn); } catch (err) { /* copy stays manual */ }
+    document.body.removeChild(area);
+  }
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-copy]') : null;
+    if (!btn) { return; }
+    var text = btn.getAttribute('data-copy');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { confirm(btn); }, function () { legacy(text, btn); });
+    } else {
+      legacy(text, btn);
+    }
+  });
+})();
+</script>
+</body>
+</html>
