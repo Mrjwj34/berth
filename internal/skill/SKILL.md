@@ -12,6 +12,35 @@ berth lifecycle operations only with berth commands — raw `rm -rf`, `git workt
 remove` and guessed PID/port cleanup corrupt the registry instead of releasing a
 workspace.
 
+## Prerequisites
+
+This skill is instructions, not the tool: every command in it needs the `berth`
+executable on `PATH`. Always start with `berth version`. If the command is
+missing, install it, verify, and only then plan any work:
+
+```sh
+go install github.com/Mrjwj34/berth/cmd/berth@latest    # Go 1.25 or newer
+```
+
+```sh
+brew install Mrjwj34/tap/berth                          # macOS, Linux
+```
+
+```powershell
+scoop bucket add berth https://github.com/Mrjwj34/scoop-bucket; scoop install berth   # Windows
+```
+
+With no package manager available, download the archive for the platform from
+`https://github.com/Mrjwj34/berth/releases`, put the `berth` (or `berth.exe`)
+executable on `PATH`, and re-run `berth version`. Installing the skill without
+the binary is a normal state — for example when the skill arrived through a skill
+installer rather than through a package manager.
+
+If the binary genuinely cannot be installed, say so and stop. Never emulate a
+berth lifecycle with raw `git worktree`, `rm -rf` or hand-picked ports: the
+machine registry, the workspace locks and the recorded state would be left
+inconsistent, and the next real berth command would have to clean up after you.
+
 ## Onboard
 
 Read the project's startup scripts, toolchains, storage paths and listen ports
