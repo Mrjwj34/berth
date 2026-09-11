@@ -11,11 +11,11 @@ func TestWrapCommandIdempotent(t *testing.T) {
 		t.Skip("no remap launcher on windows")
 	}
 	cmd := WrapCommand("httpserver 18082")
-	if !strings.HasPrefix(cmd, LaunchPath()+" -c ") {
+	if cmd != LaunchPath()+" httpserver 18082" {
 		t.Fatalf("wrap: %s", cmd)
 	}
-	if strings.Contains(cmd, "/bin/sh") {
-		t.Fatal("launch must exec the target, not SIP-restricted /bin/sh")
+	if strings.Contains(cmd, "/bin/sh") || strings.Contains(cmd, " -c ") {
+		t.Fatal("launch must exec the target; bash already tokenizes the command")
 	}
 	if again := WrapCommand(cmd); again != cmd {
 		t.Fatalf("not idempotent: %s vs %s", cmd, again)

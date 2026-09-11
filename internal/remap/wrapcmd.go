@@ -3,13 +3,14 @@ package remap
 import (
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
 // WrapCommand prefixes a process-compose command with the unsigned launcher
 // so DYLD_INSERT_LIBRARIES is set after a restricted parent (signed Go
 // binaries, process-compose, /bin/sh) has already stripped DYLD_* .
+// process-compose already runs the string via bash -c, so we must not add
+// another -c/wordexp layer (macOS wordexp+WRDE_NOCMD returns 127).
 func WrapCommand(command string) string {
 	if runtime.GOOS == "windows" || command == "" {
 		return command
@@ -18,7 +19,7 @@ func WrapCommand(command string) string {
 	if strings.HasPrefix(command, launch+" ") || command == launch {
 		return command
 	}
-	return launch + " -c " + strconv.Quote(command)
+	return launch + " " + command
 }
 
 // WrapProcessCommands rewrites each process command in a pc.yaml document.
