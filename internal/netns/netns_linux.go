@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,33 +24,52 @@ func init() {
 		os.Exit(runSupervise())
 	case "inside":
 		os.Exit(runInside())
+	case "probe":
+		if err := loUp(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 }
 
+var (
+	availOnce sync.Once
+	availOK   bool
+)
+
 func cloneUserNet() *syscall.SysProcAttr {
-	uid := os.Getuid()
-	gid := os.Getgid()
+	// Map the host user to uid 0 in the namespace so CAP_NET_ADMIN survives
+	// exec. Ambient capabilities are dropped on many runners (GitHub Actions)
+	// after exec of the Go binary, which leaves SIOCSIFFLAGS lo EPERM.
 	return &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWNET,
 		UidMappings: []syscall.SysProcIDMap{{
-			ContainerID: uid,
-			HostID:      uid,
+			ContainerID: 0,
+			HostID:      os.Getuid(),
 			Size:        1,
 		}},
 		GidMappings: []syscall.SysProcIDMap{{
-			ContainerID: gid,
-			HostID:      gid,
+			ContainerID: 0,
+			HostID:      os.Getgid(),
 			Size:        1,
 		}},
 		GidMappingsEnableSetgroups: false,
-		AmbientCaps:                []uintptr{unix.CAP_NET_ADMIN, unix.CAP_NET_BIND_SERVICE},
 	}
 }
 
 func Available() bool {
-	cmd := exec.Command("true")
-	cmd.SysProcAttr = cloneUserNet()
-	return cmd.Run() == nil
+	availOnce.Do(func() {
+		self, err := os.Executable()
+		if err != nil {
+			return
+		}
+		cmd := exec.Command(self)
+		cmd.Env = append(os.Environ(), roleEnv+"=probe")
+		cmd.SysProcAttr = cloneUserNet()
+		availOK = cmd.Run() == nil
+	})
+	return availOK
 }
 
 func Start(ctx context.Context, worktree string, maps []Mapping, bin string, args []string, env []string) error {
