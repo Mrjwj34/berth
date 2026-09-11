@@ -1,14 +1,16 @@
+// Package gc performs explicit, conservative collection under lifecycle locks.
 package gc
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
 	"github.com/Mrjwj34/lane/internal/config"
-	"github.com/Mrjwj34/lane/internal/process"
+	"github.com/Mrjwj34/lane/internal/runner"
 	"github.com/Mrjwj34/lane/internal/state"
 	"github.com/Mrjwj34/lane/internal/worktree"
 )
@@ -19,146 +21,167 @@ type Action struct {
 	Slug   string `json:"slug,omitempty"`
 	Reason string `json:"reason"`
 }
-
 type Report struct {
-	Actions []Action `json:"actions"`
+	Actions  []Action `json:"actions"`
+	Warnings []string `json:"warnings,omitempty"`
 }
-
 type Options struct {
 	DryRun bool
 	Now    time.Time
-	Down   func(ctx context.Context, path string) error
-	Remove func(ctx context.Context, ws state.Workspace, force bool) error
+	Down   func(context.Context, string) error
+	Remove func(context.Context, state.Workspace, bool) error
 }
 
 func Run(ctx context.Context, st *state.Store, opts Options) (*Report, error) {
 	if opts.Now.IsZero() {
 		opts.Now = time.Now().UTC()
 	}
-	if opts.Down == nil {
-		opts.Down = process.Down
-	}
-	file, err := st.Read(ctx)
+	f, err := st.Read(ctx)
 	if err != nil {
 		return nil, err
 	}
 	rep := &Report{Actions: []Action{}}
-
-	// 1. vanished directories
-	for key, ws := range file.Workspaces {
-		if _, err := os.Stat(ws.Path); os.IsNotExist(err) {
-			rep.Actions = append(rep.Actions, Action{Kind: "reclaim", Path: ws.Path, Slug: ws.Slug, Reason: "directory is gone"})
-			if opts.DryRun {
-				continue
+	counts := map[string]int{}
+	var list []state.Workspace
+	for _, w := range f.Workspaces {
+		list = append(list, w)
+		if w.Ownership == state.Owned {
+			counts[w.Repo]++
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].LastUsedAt.Equal(list[j].LastUsedAt) {
+			return list[i].Path < list[j].Path
+		}
+		return list[i].LastUsedAt.Before(list[j].LastUsedAt)
+	})
+	for _, snapshot := range list {
+		if err := ctx.Err(); err != nil {
+			return rep, err
+		}
+		short, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
+		unlock, err := st.LockWorkspace(short, snapshot.Path)
+		cancel()
+		if err != nil {
+			if ctx.Err() != nil {
+				return rep, ctx.Err()
 			}
-			_ = opts.Down(ctx, ws.Path)
+			continue
+		}
+		err = collect(ctx, st, opts, rep, snapshot, counts)
+		unlock()
+		if err != nil {
+			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s: %v", snapshot.Path, err))
+		}
+	}
+	return rep, nil
+}
+func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, snapshot state.Workspace, counts map[string]int) error {
+	f, err := st.Read(ctx)
+	if err != nil {
+		return err
+	}
+	w, ok := f.Workspaces[snapshot.Path]
+	if !ok || w.ID != snapshot.ID || !w.LastUsedAt.Equal(snapshot.LastUsedAt) {
+		return nil
+	}
+	runtime := runner.Existing(w)
+	down := func() error {
+		if opts.Down != nil {
+			return opts.Down(ctx, w.Path)
+		}
+		return runtime.Down(ctx)
+	}
+	add := func(kind, reason string) {
+		rep.Actions = append(rep.Actions, Action{Kind: kind, Path: w.Path, Slug: w.Slug, Reason: reason})
+	}
+	if _, err := os.Stat(w.Path); os.IsNotExist(err) {
+		if !opts.DryRun {
+			if err := down(); err != nil {
+				return err
+			}
+			if err := runtime.Destroy(ctx); err != nil {
+				return err
+			}
 			if err := st.Update(ctx, func(f *state.File) error {
-				delete(f.Workspaces, key)
+				cur, ok := f.Workspaces[w.Path]
+				if ok && cur.ID == w.ID {
+					delete(f.Workspaces, w.Path)
+				}
 				return nil
 			}); err != nil {
-				return rep, err
+				return err
 			}
 		}
+		if w.Ownership == state.Owned {
+			counts[w.Repo]--
+		}
+		add("reclaim", "directory gone; runtime stopped before releasing registration")
+		return nil
+	} else if err != nil {
+		return err
 	}
-
-	file, err = st.Read(ctx)
+	cfg := config.Defaults()
+	if _, err := os.Stat(filepath.Join(w.Path, config.Filename)); err == nil {
+		loaded, err := config.Load(filepath.Join(w.Path, config.Filename))
+		if err != nil {
+			return err
+		}
+		cfg = *loaded
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	running, err := runtime.Running(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	// 2. idle stop
-	for _, ws := range file.Workspaces {
-		cfg, _, err := config.Find(ws.Repo)
-		if err != nil || cfg.GC.IdleStopHours <= 0 {
-			continue
-		}
-		if !process.Running(ctx, ws.Path) {
-			continue
-		}
-		idle := opts.Now.Sub(ws.LastUsedAt)
-		if ws.LastUsedAt.IsZero() || idle < time.Duration(cfg.GC.IdleStopHours)*time.Hour {
-			continue
-		}
-		rep.Actions = append(rep.Actions, Action{Kind: "idle_stop", Path: ws.Path, Slug: ws.Slug, Reason: fmt.Sprintf("idle for %s", idle.Round(time.Minute))})
+	if running && !w.LastUsedAt.IsZero() && cfg.GC.IdleStopHours > 0 && opts.Now.Sub(w.LastUsedAt) >= time.Duration(cfg.GC.IdleStopHours)*time.Hour {
 		if !opts.DryRun {
-			if err := opts.Down(ctx, ws.Path); err != nil {
-				return rep, err
+			if err := down(); err != nil {
+				return err
 			}
+		}
+		add("idle_stop", "no lane operation within configured idle period")
+		return nil
+	}
+	if running || w.Ownership != state.Owned || !w.SetupComplete {
+		return nil
+	}
+	age := opts.Now.Sub(w.LastUsedAt)
+	if w.LastUsedAt.IsZero() {
+		age = opts.Now.Sub(w.CreatedAt)
+	}
+	kind, reason := "", ""
+	if cfg.GC.RemoveAfterDays > 0 && age >= time.Duration(cfg.GC.RemoveAfterDays)*24*time.Hour {
+		merged, err := worktree.MergedInto(ctx, w.Repo, w.Branch, w.Base)
+		if err != nil {
+			return err
+		}
+		if merged {
+			kind = "remove_merged"
+			reason = "merged branch beyond retention"
 		}
 	}
-
-	// 3. merged branch cleanup
-	for _, ws := range file.Workspaces {
-		cfg, _, err := config.Find(ws.Repo)
-		if err != nil || cfg.GC.RemoveAfterDays <= 0 {
-			continue
+	if kind == "" && cfg.GC.MaxWorkspaces > 0 && counts[w.Repo] > cfg.GC.MaxWorkspaces {
+		kind = "evict"
+		reason = "over quota; commits preserved"
+	}
+	if kind == "" {
+		return nil
+	}
+	if err := worktree.Preserved(ctx, w.Repo, w.Path, w.Base); err != nil {
+		return nil
+	}
+	if !opts.DryRun {
+		if opts.Remove == nil {
+			return fmt.Errorf("safe removal callback missing")
 		}
-		base := ws.Base
-		if base == "" {
-			base = cfg.Base
-		}
-		merged, err := worktree.MergedInto(ctx, ws.Repo, ws.Branch, base)
-		if err != nil || !merged {
-			continue
-		}
-		age := opts.Now.Sub(ws.LastUsedAt)
-		if ws.LastUsedAt.IsZero() {
-			age = opts.Now.Sub(ws.CreatedAt)
-		}
-		if age < time.Duration(cfg.GC.RemoveAfterDays)*24*time.Hour {
-			continue
-		}
-		dirty, _, _ := worktree.Dirty(ctx, ws.Path)
-		if dirty {
-			continue
-		}
-		rep.Actions = append(rep.Actions, Action{Kind: "remove_merged", Path: ws.Path, Slug: ws.Slug, Reason: fmt.Sprintf("branch %s merged into %s", ws.Branch, base)})
-		if !opts.DryRun && opts.Remove != nil {
-			if err := opts.Remove(ctx, ws, false); err != nil {
-				return rep, err
-			}
+		// Automatic collection must never grant force authority.
+		if err := opts.Remove(ctx, w, false); err != nil {
+			return err
 		}
 	}
-
-	file, err = st.Read(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. quota eviction per repo
-	byRepo := map[string][]state.Workspace{}
-	for _, ws := range file.Workspaces {
-		byRepo[ws.Repo] = append(byRepo[ws.Repo], ws)
-	}
-	for repo, list := range byRepo {
-		cfg, _, err := config.Find(repo)
-		if err != nil || cfg.GC.MaxWorkspaces <= 0 || len(list) <= cfg.GC.MaxWorkspaces {
-			continue
-		}
-		sort.Slice(list, func(i, j int) bool {
-			return list[i].LastUsedAt.Before(list[j].LastUsedAt)
-		})
-		overflow := len(list) - cfg.GC.MaxWorkspaces
-		for _, ws := range list {
-			if overflow <= 0 {
-				break
-			}
-			if process.Running(ctx, ws.Path) {
-				continue
-			}
-			dirty, _, _ := worktree.Dirty(ctx, ws.Path)
-			if dirty {
-				continue
-			}
-			rep.Actions = append(rep.Actions, Action{Kind: "evict", Path: ws.Path, Slug: ws.Slug, Reason: fmt.Sprintf("over max_workspaces=%d", cfg.GC.MaxWorkspaces)})
-			overflow--
-			if !opts.DryRun && opts.Remove != nil {
-				if err := opts.Remove(ctx, ws, false); err != nil {
-					return rep, err
-				}
-			}
-		}
-	}
-
-	return rep, nil
+	counts[w.Repo]--
+	add(kind, reason)
+	return nil
 }

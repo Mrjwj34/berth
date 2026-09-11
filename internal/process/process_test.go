@@ -44,16 +44,22 @@ func TestRenderExpandsAndInjectsEnv(t *testing.T) {
 }
 
 func TestUpDownSimpleHTTP(t *testing.T) {
+	t.Setenv("LANE_HOME", t.TempDir())
+	python := "python3"
 	if runtime.GOOS == "windows" {
-		t.Skip("unix socket path in this test")
+		python = "python"
 	}
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not available")
-	}
-	if _, err := LookPath(); err != nil {
-		if _, err := Ensure(context.Background()); err != nil {
-			t.Skip(err)
+	if _, err := exec.LookPath(python); err != nil {
+		if os.Getenv("LANE_TEST_REQUIRE_NATIVE") == "1" {
+			t.Fatal(err)
 		}
+		t.Skip(err)
+	}
+	if _, err := Ensure(context.Background()); err != nil {
+		if os.Getenv("LANE_TEST_REQUIRE_NATIVE") == "1" {
+			t.Fatal(err)
+		}
+		t.Skip(err)
 	}
 	dir := t.TempDir()
 	if err := os.MkdirAll(config.LaneDir(dir), 0o755); err != nil {
@@ -72,14 +78,23 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 	}
 	procs := map[string]any{
 		"web": map[string]any{
-			"command": "python3 -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
+			"command": python + " -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
 		},
 	}
 	if err := Render(dir, procs, env); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err := Up(ctx, dir, env, 0); err != nil {
+	pcPort := 0
+	if runtime.GOOS == "windows" {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		pcPort = l.Addr().(*net.TCPAddr).Port
+		_ = l.Close()
+	}
+	if err := Up(ctx, dir, env, pcPort); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = Down(ctx, dir) }()

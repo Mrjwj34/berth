@@ -1,0 +1,79 @@
+# Runtime contract
+
+`native` is the low-overhead fast path for configurable applications. It provides
+worktree lifecycle, port reservations, per-worktree data and native process
+supervision. It does not isolate hardcoded loopback ports, absolute storage paths,
+Unix sockets, registries, shared credentials or arbitrary host access.
+
+`container` supplies one reusable Linux container per workspace using an existing
+local Docker or Podman engine. No VM or image is created per command. A prepared
+image must provide bash, sh, sleep, socat, git, process-compose v1.122.0 and the
+project's tools. The checked-in Dockerfile is a minimal example, not an attempt to
+bundle every language. Mutable image tags can change after reset/recreation; use
+an image digest where reproducibility matters.
+
+## Execution and addresses
+
+The whole workspace's service graph, hooks, probes and one-off commands execute
+in one runtime. Container cwd is `/workspace`, data is `/workspace/.lane/data`.
+A writable bind mount carries the checkout; shared Git metadata is mounted at
+`/lane/git`. GIT_DIR/GIT_WORK_TREE point Git at the corresponding linked-worktree
+metadata. The managed HOME is private to the container. Host credentials and the
+Docker socket are not mounted automatically.
+
+The process definitions retain process-compose syntax. Native hooks use sh on
+Unix and cmd on Windows; arbitrary shell strings are not made portable. Container
+hooks use sh. `run` preserves argv, while `run -- sh -c ...` intentionally invokes
+a shell. Rootless/user mapping and mounted filesystem permissions depend on the
+engine; runtime.user can override the default. Native Linux uses the host UID/GID
+inside Docker; rootless Podman uses keep-id. Rootless Docker may require an explicit
+runtime.user override matching its user namespace.
+
+`ports` names host publications. `listen` specifies their original TCP port in
+container mode. Every named port requires a listen value. Internal services can
+also use undeclared ports, but lane does not dynamically discover/publish them.
+`LANE_PORT_*` means the current execution context; `LANE_HOST_PORT_*` means the
+host publication. Browser code running outside the container must use published
+URLs rather than blindly reusing internal localhost URLs.
+
+Publications bind to host 127.0.0.1. An internal socat gateway forwards from a high
+container port to the application's IPv4 loopback listener. `plan.gateway_ports`
+lists reserved gateway ports; applications must not bind those gateway ports.
+Declaring the application's listeners lets the allocator avoid them, including
+listeners in 20000..39999. Gateways are supervised by the container entrypoint;
+a gateway's exit stops the container rather than silently disabling a publication.
+The publication contract is TCP/IPv4, not UDP or IPv6-only loopback. Use a current
+engine; old Docker versions have different localhost-publishing security behavior.
+
+Separate network namespaces prevent internal loopback/port collisions. They are
+not egress firewalls and do not forbid reaching other host publications. Network
+access uses the engine's normal bridge/NAT/DNS configuration. Unix sockets stored
+at workspace-relative locations remain distinct; shared host paths do not.
+
+## Lifetime and recovery
+
+A stored runtime contract (backend, image reference, engine, limits, named ports)
+is immutable for an existing workspace. Changing processes/hooks/env in the
+workspace is supported. Changing the runtime/port contract requires a new
+workspace. This avoids silently changing meaning or controlling unrelated
+resources while partial state is present.
+
+Container name and labels must match the stored workspace ID, canonical path and
+runtime specification before stop/remove. Daemon failure is not treated as
+container absence. No implicit pull, build, or native fallback occurs. Setup is
+idempotent by project responsibility: lane records completion, and retries an
+incomplete setup. Projects must not assume arbitrary hook effects can be rolled
+back transactionally.
+
+`down` stops the workspace, preserving its checkout/data and container instance.
+`reset` destroys the stopped runtime, resets private data, recreates it and reruns
+setup. `done` never removes an adopted checkout. Any stop/identity failure blocks
+destructive work. Cancellation of `run` in container mode stops that workspace's
+whole container; sibling services within that workspace stop too, but other
+workspaces remain running.
+
+The runtime and repository data are not an adversarial security boundary: shared
+Git metadata is writable, user hooks are code, and explicitly supplied config may
+contain side effects. An untrusted-agent sandbox needs separate credentials,
+filesystem policy, egress policy and resource enforcement. Do not describe this
+runner as a complete security sandbox.

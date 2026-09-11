@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Mrjwj34/lane/internal/app"
 	"github.com/Mrjwj34/lane/internal/version"
@@ -55,12 +57,14 @@ func newRoot(info version.Info) *cobra.Command {
 		cmdHook(),
 		cmdOpen(&asJSON),
 		cmdVersion(info),
+		cmdPlan(),
 	)
 	return root
 }
 
 func withApp(fn func(context.Context, *app.App) error) error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	a, err := app.Open(ctx)
 	if err != nil {
 		return err
@@ -77,4 +81,20 @@ func cmdVersion(info version.Info) *cobra.Command {
 			fmt.Fprintf(cmd.OutOrStdout(), "lane %s (commit: %s, date: %s)\n", info.Version, info.Commit, info.Date)
 		},
 	}
+}
+
+func cmdPlan() *cobra.Command {
+	return &cobra.Command{Use: "plan [slug]", Short: "Inspect the execution contract without starting processes", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		slug := ""
+		if len(args) > 0 {
+			slug = args[0]
+		}
+		return withApp(func(ctx context.Context, a *app.App) error {
+			p, err := a.Plan(ctx, slug)
+			if err != nil {
+				return err
+			}
+			return writeJSON(cmd.OutOrStdout(), p)
+		})
+	}}
 }

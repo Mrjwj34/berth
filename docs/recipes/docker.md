@@ -1,28 +1,28 @@
-# Recipe: Docker is just a process
+# Linux runtime / Docker
 
-## When to use
+Prefer runtime.backend: container when a workspace needs unchanged hardcoded
+ports. A single reusable container carries the workspace's ordinary processes;
+process-compose runs inside it. This avoids confusing a short-lived docker CLI
+process with the daemon-owned lifetime of the actual container.
 
-The project already has a container image and you want that container bound to this workspace's ports and (optionally) data dir. lane does not know Docker. `docker run --rm --name ... -p $LANE_PORT_X:...` is an ordinary `processes` command, same as a native binary.
-
-The app must read published ports from env (`LANE_PORT_*`). Never hardcode host ports. Discover the assigned port with `lane ports --json` or `lane status --json`. Prefer a native binary (see the other recipes) when the tool is already installed — Docker is optional, not a lane feature.
-
-## `lane.yaml` fragment
+Build runtime/Dockerfile once in the lane repository, or use it as a basis for a
+project toolchain image. Select that existing image in lane.yaml:
 
 ```yaml
-ports: [pg]
-env:
-  DATABASE_URL: postgres://postgres@127.0.0.1:${LANE_PORT_PG}/app
-hooks:
-  setup:
-    - mkdir -p "$LANE_DATA_DIR/pg"
+version: 1
+runtime:
+  backend: container
+  engine: docker
+  image: lane-runtime:local
+ports: [web]
+listen: {web: 8080}
 processes:
-  pg:
-    command: docker run --rm --name "lane-${LANE_SLUG}-pg" -p "$LANE_PORT_PG:5432" -v "$LANE_DATA_DIR/pg:/var/lib/postgresql/data" -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app postgres:16
-    readiness_probe:
-      exec:
-        command: pg_isready -h 127.0.0.1 -p "$LANE_PORT_PG"
+  web:
+    command: python3 -m http.server 8080 --bind 127.0.0.1
 ```
 
-`--rm` and a name that includes `$LANE_SLUG` keep containers from colliding across workspaces. Map the workspace port on the left of `-p` (`$LANE_PORT_X:containerPort`). Persist container files with a bind mount into `$LANE_DATA_DIR`, not a Docker named volume shared by every workspace.
-
-lane still supervises this as one process. Do not call `docker compose` / process-compose yourself; use `lane up`, `lane down`, `lane logs pg`, and `lane doctor` on failure.
+Services, probes, hooks and lane run share this runtime. Public host endpoints use
+LANE_HOST_PORT_WEB; in-runtime clients keep localhost:8080. No docker.sock or host
+credentials are automatically mounted. Do not use --network=host or guessed ports
+to circumvent the workspace contract. See ../runtime.md for supported protocols,
+rootless/desktop engine caveats and ownership/cleanup rules.
