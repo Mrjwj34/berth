@@ -39,13 +39,17 @@ def main():
                      ("config", "user.email", "lane-e2e@example.invalid")]:
             command(["git", *args])
         run("init")
-        (repo / "server.py").write_text('''import http.server, os
+        (repo / "server.py").write_text('''import time
+print("starting server", time.time(), flush=True)
+import http.server, os
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(os.environ["LANE_SLUG"].encode())
-http.server.ThreadingHTTPServer(("127.0.0.1", int(os.environ["LANE_PORT_WEB"])), Handler).serve_forever()
+server = http.server.ThreadingHTTPServer(("127.0.0.1", int(os.environ["LANE_PORT_WEB"])), Handler)
+print("listening", time.time(), flush=True)
+server.serve_forever()
 ''')
         (repo / "setup.py").write_text('''import os
 from pathlib import Path
@@ -60,10 +64,12 @@ hooks:
 processes:
   web:
     command: {python} server.py
+    log_location: .lane/web.log
     readiness_probe:
       http_get: {{host: 127.0.0.1, port: '${{LANE_PORT_WEB}}', path: /}}
       initial_delay_seconds: 0
       period_seconds: 1
+      failure_threshold: 60
 ''')
         command(["git", "add", "."])
         command(["git", "commit", "-m", "native acceptance fixture"])
@@ -107,7 +113,7 @@ processes:
             print("PASS: native parallel workspaces, HTTP, JSON, hooks, argv, exit codes, restart, reset and cleanup")
         finally:
             if sys.exc_info()[0] is not None:
-                for pattern in ("*.lanes/*/.lane/process-compose.log", "*.lanes/*/.lane/pc.yaml"):
+                for pattern in ("*.lanes/*/.lane/*.log", "*.lanes/*/.lane/pc.yaml"):
                     for diagnostic in root.glob(pattern):
                         print(f"--- {diagnostic}\n{diagnostic.read_text(errors='replace')}", file=sys.stderr)
                 for name in names:
