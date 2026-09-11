@@ -1,0 +1,95 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name (e.g. v0.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Determine Version
+        id: vars
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Build Binaries
+        run: |
+          mkdir -p dist
+          TAG="${{ steps.vars.outputs.tag }}"
+          COMMIT="${{ steps.vars.outputs.commit }}"
+          DATE="${{ steps.vars.outputs.date }}"
+          LDFLAGS="-s -w -X main.appVersion=${TAG} -X main.commit=${COMMIT} -X main.date=${DATE}"
+
+          TARGETS=(
+            "linux/amd64"
+            "linux/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+            "windows/amd64"
+            "windows/arm64"
+          )
+
+          for TARGET in "${TARGETS[@]}"; do
+            GOOS="${TARGET%/*}"
+            GOARCH="${TARGET#*/}"
+            BIN_NAME="lane"
+            ARCHIVE_EXT="tar.gz"
+            if [ "$GOOS" = "windows" ]; then
+              BIN_NAME="lane.exe"
+              ARCHIVE_EXT="zip"
+            fi
+
+            OUTPUT_DIR="build_${GOOS}_${GOARCH}"
+            mkdir -p "${OUTPUT_DIR}"
+            echo "Building ${GOOS}/${GOARCH}..."
+            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build -ldflags "${LDFLAGS}" -o "${OUTPUT_DIR}/${BIN_NAME}" ./cmd/lane
+
+            ARCHIVE_NAME="lane_${TAG#v}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}"
+            if [ "$ARCHIVE_EXT" = "zip" ]; then
+              (cd "${OUTPUT_DIR}" && zip -q "../dist/${ARCHIVE_NAME}" "${BIN_NAME}")
+            else
+              tar -czf "dist/${ARCHIVE_NAME}" -C "${OUTPUT_DIR}" "${BIN_NAME}"
+            fi
+            rm -rf "${OUTPUT_DIR}"
+          done
+
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "lane ${{ steps.vars.outputs.tag }}"
+          tag_name: ${{ steps.vars.outputs.tag }}
+          files: |
+            dist/*
+          generate_release_notes: true
