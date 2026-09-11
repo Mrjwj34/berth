@@ -1,6 +1,7 @@
 package remap
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -81,15 +82,10 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	if err := Setup(ctx, dir, []Mapping{{Name: "api", Listen: listen, Host: host}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	cmd := LaunchCmd(server, strconv.Itoa(listen))
-	cmd.Env = Environ(os.Environ(), dir)
-	cmd.Dir = dir
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	srv := startLaunched(t, dir, server, listen)
+	defer srv.stop()
 	if !httpOK(t, host) {
-		t.Fatalf("published %d did not serve; listenBusy=%v table=%q", host, !portFree(listen), tableDump(dir))
+		t.Fatalf("published %d did not serve; listenBusy=%v table=%q exited=%v stderr=%q", host, !portFree(listen), tableDump(dir), srv.exitStatus(), srv.stderr.String())
 	}
 	if !portFree(listen) {
 		t.Fatal("hardcoded listen port leaked onto the host")
@@ -182,15 +178,72 @@ func TestTwoWorkspacesSameListenPort(t *testing.T) {
 }
 
 type remappedHTTP struct {
-	cmd  *exec.Cmd
+	srv  *launched
 	host int
 }
 
 func (r remappedHTTP) stop() {
-	if r.cmd != nil && r.cmd.Process != nil {
-		_ = r.cmd.Process.Kill()
-		_ = r.cmd.Wait()
+	if r.srv != nil {
+		r.srv.stop()
 	}
+}
+
+type launched struct {
+	cmd    *exec.Cmd
+	stderr bytes.Buffer
+	waited chan error
+	done   error
+	exited bool
+}
+
+func (l *launched) stop() {
+	if l == nil || l.cmd == nil || l.cmd.Process == nil {
+		return
+	}
+	_ = l.cmd.Process.Kill()
+	if l.waited != nil {
+		l.done = <-l.waited
+		l.exited = true
+		l.waited = nil
+	}
+}
+
+func (l *launched) exitStatus() string {
+	if l == nil {
+		return "nil"
+	}
+	select {
+	case err := <-l.waited:
+		l.done = err
+		l.exited = true
+		l.waited = nil
+		if err != nil {
+			return err.Error()
+		}
+		return "exited 0"
+	default:
+		if l.exited {
+			if l.done != nil {
+				return l.done.Error()
+			}
+			return "exited 0"
+		}
+		return "running"
+	}
+}
+
+func startLaunched(t *testing.T, dir, server string, listen int) *launched {
+	t.Helper()
+	l := &launched{waited: make(chan error, 1)}
+	l.cmd = LaunchCmd(server, strconv.Itoa(listen))
+	l.cmd.Dir = dir
+	l.cmd.Env = Environ(os.Environ(), dir)
+	l.cmd.Stderr = &l.stderr
+	if err := l.cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	go func() { l.waited <- l.cmd.Wait() }()
+	return l
 }
 
 func startRemappedHTTP(t *testing.T, ctx context.Context, listen int) remappedHTTP {
@@ -204,17 +257,14 @@ func startRemappedHTTP(t *testing.T, ctx context.Context, listen int) remappedHT
 	if err := CompileHTTPServer(ctx, server); err != nil {
 		t.Fatal(err)
 	}
-	cmd := LaunchCmd(server, strconv.Itoa(listen))
-	cmd.Dir = dir
-	cmd.Env = Environ(os.Environ(), dir)
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
+	srv := startLaunched(t, dir, server, listen)
 	if !httpOK(t, host) {
-		_ = cmd.Process.Kill()
-		t.Fatalf("server on host %d did not become ready; listenBusy=%v table=%q", host, !portFree(listen), tableDump(dir))
+		st := srv.exitStatus()
+		errBuf := srv.stderr.String()
+		srv.stop()
+		t.Fatalf("server on host %d did not become ready; listenBusy=%v table=%q exited=%s stderr=%q", host, !portFree(listen), tableDump(dir), st, errBuf)
 	}
-	return remappedHTTP{cmd: cmd, host: host}
+	return remappedHTTP{srv: srv, host: host}
 }
 
 func httpOK(t *testing.T, port int) bool {

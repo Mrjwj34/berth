@@ -26,9 +26,35 @@ static int (*real_connect)(int, const struct sockaddr *, socklen_t);
 static int (*real_getsockname)(int, struct sockaddr *, socklen_t *);
 static int (*real_getpeername)(int, struct sockaddr *, socklen_t *);
 
+#ifdef __APPLE__
+static void *system_lib(void) {
+	/*
+	 * DYLD_INTERPOSE + dlsym(RTLD_NEXT, "bind") can resolve back to
+	 * lane_bind and overflow the stack on the first bind(). libSystem
+	 * is the real libc and is always loaded.
+	 */
+	static void *h;
+	if (!h)
+		h = dlopen("/usr/lib/libSystem.B.dylib", RTLD_NOLOAD | RTLD_LAZY);
+	if (!h)
+		h = dlopen("/usr/lib/libSystem.B.dylib", RTLD_LAZY);
+	return h;
+}
+#endif
+
 static void load_reals(void) {
 	if (real_bind)
 		return;
+#ifdef __APPLE__
+	void *h = system_lib();
+	if (h) {
+		real_bind = (int (*)(int, const struct sockaddr *, socklen_t))dlsym(h, "bind");
+		real_connect = (int (*)(int, const struct sockaddr *, socklen_t))dlsym(h, "connect");
+		real_getsockname = (int (*)(int, struct sockaddr *, socklen_t *))dlsym(h, "getsockname");
+		real_getpeername = (int (*)(int, struct sockaddr *, socklen_t *))dlsym(h, "getpeername");
+		return;
+	}
+#endif
 	real_bind = (int (*)(int, const struct sockaddr *, socklen_t))dlsym(RTLD_NEXT, "bind");
 	real_connect = (int (*)(int, const struct sockaddr *, socklen_t))dlsym(RTLD_NEXT, "connect");
 	real_getsockname = (int (*)(int, struct sockaddr *, socklen_t *))dlsym(RTLD_NEXT, "getsockname");
@@ -232,6 +258,10 @@ static int unmap_host(int host) {
 
 static int lane_bind(int fd, const struct sockaddr *addr, socklen_t len) {
 	load_reals();
+	if (!real_bind) {
+		errno = ENOSYS;
+		return -1;
+	}
 	if (!addr || (addr->sa_family != AF_INET && addr->sa_family != AF_INET6))
 		return real_bind(fd, addr, len);
 	int want = port_of(addr);
@@ -248,6 +278,10 @@ static int lane_bind(int fd, const struct sockaddr *addr, socklen_t len) {
 
 static int lane_connect(int fd, const struct sockaddr *addr, socklen_t len) {
 	load_reals();
+	if (!real_connect) {
+		errno = ENOSYS;
+		return -1;
+	}
 	if (!addr || !is_loopback(addr))
 		return real_connect(fd, addr, len);
 	int dest = port_of(addr);
@@ -266,6 +300,10 @@ static int lane_connect(int fd, const struct sockaddr *addr, socklen_t len) {
 
 static int lane_getsockname(int fd, struct sockaddr *addr, socklen_t *len) {
 	load_reals();
+	if (!real_getsockname) {
+		errno = ENOSYS;
+		return -1;
+	}
 	int rc = real_getsockname(fd, addr, len);
 	if (rc != 0 || !addr)
 		return rc;
@@ -278,6 +316,10 @@ static int lane_getsockname(int fd, struct sockaddr *addr, socklen_t *len) {
 
 static int lane_getpeername(int fd, struct sockaddr *addr, socklen_t *len) {
 	load_reals();
+	if (!real_getpeername) {
+		errno = ENOSYS;
+		return -1;
+	}
 	int rc = real_getpeername(fd, addr, len);
 	if (rc != 0 || !addr)
 		return rc;

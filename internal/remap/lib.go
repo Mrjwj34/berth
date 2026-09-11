@@ -99,7 +99,8 @@ func EnsureLib(ctx context.Context) (string, error) {
 	if err := compileLaunch(ctx, cc, dir); err != nil {
 		return "", err
 	}
-	unsign(lib)
+	// Keep the compiler's ad-hoc signature on the dylib. Stripping it
+	// makes AMFI refuse DYLD_INSERT_LIBRARIES on modern macOS.
 	return lib, nil
 }
 

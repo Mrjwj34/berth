@@ -375,14 +375,19 @@ func readPCPort(worktree string) int {
 func waitReady(ctx context.Context, worktree string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var last []Proc
+	seen := false
 	for time.Now().Before(deadline) {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		if !Running(ctx, worktree) {
+			if seen {
+				return fmt.Errorf("process-compose exited before processes became ready: %+v. Inspect %s or run lane doctor", last, LogFile(worktree))
+			}
 			time.Sleep(150 * time.Millisecond)
 			continue
 		}
+		seen = true
 		procs, err := Status(ctx, worktree)
 		if err != nil {
 			time.Sleep(150 * time.Millisecond)
