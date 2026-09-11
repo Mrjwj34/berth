@@ -1,0 +1,61 @@
+#if !defined(_XOPEN_SOURCE) && !defined(__APPLE__)
+#define _XOPEN_SOURCE 700
+#endif
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <wordexp.h>
+
+static void install_preload(void) {
+	const char *lib = getenv("LANE_REMAP_LIB");
+	if (!lib || !lib[0])
+		return;
+#ifdef __APPLE__
+	/*
+	 * Signed/SIP parents strip DYLD_* on exec. LANE_REMAP_LIB survives;
+	 * we set DYLD here, then exec the target ourselves. Do not exec
+	 * /bin/sh — it is restricted and would strip DYLD again.
+	 */
+	setenv("DYLD_INSERT_LIBRARIES", lib, 1);
+#else
+	const char *old = getenv("LD_PRELOAD");
+	if (old && old[0] && strcmp(old, lib) != 0) {
+		size_t n = strlen(lib) + strlen(old) + 2;
+		char *buf = malloc(n);
+		if (buf) {
+			snprintf(buf, n, "%s:%s", lib, old);
+			setenv("LD_PRELOAD", buf, 1);
+		}
+	} else {
+		setenv("LD_PRELOAD", lib, 1);
+	}
+#endif
+}
+
+int main(int argc, char **argv) {
+	if (argc < 2) {
+		fprintf(stderr, "lane-remap-launch: missing command\n");
+		return 127;
+	}
+	install_preload();
+	if (strcmp(argv[1], "-c") == 0) {
+		if (argc < 3 || !argv[2][0]) {
+			fprintf(stderr, "lane-remap-launch: missing command\n");
+			return 127;
+		}
+		wordexp_t we;
+		memset(&we, 0, sizeof(we));
+		if (wordexp(argv[2], &we, WRDE_NOCMD) != 0 || we.we_wordc == 0) {
+			fprintf(stderr, "lane-remap-launch: cannot parse command\n");
+			return 127;
+		}
+		execvp(we.we_wordv[0], we.we_wordv);
+		fprintf(stderr, "lane-remap-launch: exec %s: command not found\n", we.we_wordv[0]);
+		wordfree(&we);
+		return 127;
+	}
+	execvp(argv[1], argv + 1);
+	fprintf(stderr, "lane-remap-launch: exec %s: command not found\n", argv[1]);
+	return 127;
+}

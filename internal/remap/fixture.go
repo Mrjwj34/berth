@@ -48,5 +48,6 @@ func compileC(ctx context.Context, dest, name, src string) error {
 	if err != nil {
 		return fmt.Errorf("compile %s: %w\n%s", name, err, out)
 	}
+	unsign(dest)
 	return nil
 }

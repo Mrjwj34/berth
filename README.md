@@ -136,7 +136,7 @@ gc:
   max_workspaces: 8                          # 超过最大配额时淘汰最旧的干净工作区
 ```
 
-通用原语是 `isolate: net`：进程留在主机网络上（公网、Docker、DNS 都还能用），lane 只改写回环上的硬编码 `bind`/`connect`，映射到唯一宿主端口。不写 `listen:` 时也会发现并登记这些端口。`listen:` 只用来给宿主端口命名。进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`（不隔离）。Linux / macOS 用 libc preload（Linux 上 Go 另走 seccomp）；Windows 尚未实现。
+通用原语是 `isolate: net`：进程留在主机网络上（公网、Docker、DNS 都还能用），lane 只改写回环上的硬编码 `bind`/`connect`，映射到唯一宿主端口。不写 `listen:` 时也会发现并登记这些端口。`listen:` 只用来给宿主端口命名。进程已接受 `--port` / `$PORT` 时，仍可用短写 `ports: [web, api]`（不隔离）。Linux / macOS 用 libc preload（Linux 上 Go 另走 seccomp）。macOS 上签名/SIP 父进程会丢掉 `DYLD_*`，lane 用未签名的 `lane-remap-launch` 在 exec 目标进程前重新注入。Windows 尚未实现。
 
 ---
 

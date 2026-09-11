@@ -3,6 +3,8 @@ package process
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +20,9 @@ import (
 	"github.com/Mrjwj34/lane/internal/remap"
 	"gopkg.in/yaml.v3"
 )
+
+// Darwin sockaddr_un.sun_path is 104 bytes including NUL. Keep a margin.
+const maxUnixSocketPath = 100
 
 type Proc struct {
 	Name    string `json:"name"`
@@ -38,7 +43,16 @@ type pcProcess struct {
 }
 
 func PCFile(worktree string) string { return filepath.Join(config.LaneDir(worktree), "pc.yaml") }
-func Socket(worktree string) string { return filepath.Join(config.LaneDir(worktree), "pc.sock") }
+
+func Socket(worktree string) string {
+	p := filepath.Join(config.LaneDir(worktree), "pc.sock")
+	if runtime.GOOS == "windows" || len(p) < maxUnixSocketPath {
+		return p
+	}
+	sum := sha256.Sum256([]byte(p))
+	return filepath.Join("/tmp", "lnpc-"+hex.EncodeToString(sum[:6])+".sock")
+}
+
 func LogFile(worktree string) string {
 	return filepath.Join(config.LaneDir(worktree), "process-compose.log")
 }
@@ -53,6 +67,9 @@ func Render(worktree string, processes map[string]any, env map[string]string, ma
 	procs, ok := expanded.(map[string]any)
 	if !ok {
 		return fmt.Errorf("processes must be a mapping")
+	}
+	if env[remap.EnvOn] == "1" {
+		remap.WrapProcessCommands(procs)
 	}
 	envList := make([]any, 0, len(env))
 	for k, v := range env {
@@ -245,6 +262,9 @@ func injectProcessEnv(path string, extra map[string]string) error {
 		}
 		proc["environment"] = existing
 		procs[name] = proc
+	}
+	if extra[remap.EnvOn] == "1" {
+		remap.WrapProcessCommands(procs)
 	}
 	out, err := yaml.Marshal(doc)
 	if err != nil {

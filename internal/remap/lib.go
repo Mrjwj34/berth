@@ -13,7 +13,7 @@ import (
 )
 
 func sourceHash() string {
-	sum := sha256.Sum256([]byte(preloadSrc + "\n" + wrapSrc + "\n" + runtime.GOOS + "\n" + runtime.GOARCH))
+	sum := sha256.Sum256([]byte(preloadSrc + "\n" + wrapSrc + "\n" + launchSrc + "\n" + runtime.GOOS + "\n" + runtime.GOARCH))
 	return hex.EncodeToString(sum[:12])
 }
 
@@ -46,7 +46,7 @@ func EnsureLib(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("%w", errUnsupported)
 	}
 	lib := LibPath()
-	if libFresh(lib) && wrapFresh() {
+	if libFresh(lib) && wrapFresh() && launchFresh() {
 		return lib, nil
 	}
 	if err := ctx.Err(); err != nil {
@@ -72,14 +72,12 @@ func EnsureLib(ctx context.Context) (string, error) {
 		return "", err
 	}
 	tmp := filepath.Join(dir, libName())
-	args := []string{"-O2", "-o", tmp}
+	var args []string
 	if runtime.GOOS == "darwin" {
-		args = append([]string{"-dynamiclib", "-fPIC"}, args...)
+		args = []string{"-dynamiclib", "-fPIC", "-O2", "-install_name", lib, "-o", tmp, src}
 	} else {
-		args = append([]string{"-shared", "-fPIC"}, args...)
-		args = append(args, "-ldl")
+		args = []string{"-shared", "-fPIC", "-O2", "-o", tmp, src, "-ldl"}
 	}
-	args = append(args, src)
 	cmd := exec.CommandContext(ctx, cc, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -98,6 +96,10 @@ func EnsureLib(ctx context.Context) (string, error) {
 	if err := compileWrap(ctx, cc, dir); err != nil {
 		return "", err
 	}
+	if err := compileLaunch(ctx, cc, dir); err != nil {
+		return "", err
+	}
+	unsign(lib)
 	return lib, nil
 }
 
@@ -106,6 +108,14 @@ func wrapFresh() bool {
 		return true
 	}
 	st, err := os.Stat(WrapPath())
+	return err == nil && !st.IsDir() && st.Size() > 0
+}
+
+func launchFresh() bool {
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	st, err := os.Stat(LaunchPath())
 	return err == nil && !st.IsDir() && st.Size() > 0
 }
 
@@ -127,7 +137,47 @@ func compileWrap(ctx context.Context, cc, dir string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(WrapPath(), data, 0o755)
+	if err := os.WriteFile(WrapPath(), data, 0o755); err != nil {
+		return err
+	}
+	unsign(WrapPath())
+	return nil
+}
+
+func compileLaunch(ctx context.Context, cc, dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	src := filepath.Join(dir, "launch.c")
+	if err := os.WriteFile(src, []byte(launchSrc), 0o644); err != nil {
+		return err
+	}
+	tmp := filepath.Join(dir, "lane-remap-launch")
+	cmd := exec.CommandContext(ctx, cc, "-O2", "-o", tmp, src)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("compile remap launcher: %w\n%s", err, out)
+	}
+	data, err := os.ReadFile(tmp)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(LaunchPath(), data, 0o755); err != nil {
+		return err
+	}
+	unsign(LaunchPath())
+	return nil
+}
+
+func unsign(path string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	cs, err := exec.LookPath("codesign")
+	if err != nil {
+		return
+	}
+	_ = exec.Command(cs, "--remove-signature", path).Run()
 }
 
 func Available() bool {

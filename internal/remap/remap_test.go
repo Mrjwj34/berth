@@ -81,7 +81,7 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	if err := Setup(ctx, dir, []Mapping{{Name: "api", Listen: listen, Host: host}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(server, strconv.Itoa(listen))
+	cmd := LaunchCmd(server, strconv.Itoa(listen))
 	cmd.Env = Environ(os.Environ(), dir)
 	cmd.Dir = dir
 	if err := cmd.Start(); err != nil {
@@ -89,7 +89,7 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	}
 	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
 	if !httpOK(t, host) {
-		t.Fatalf("published %d did not serve", host)
+		t.Fatalf("published %d did not serve; listenBusy=%v table=%q", host, !portFree(listen), tableDump(dir))
 	}
 	if !portFree(listen) {
 		t.Fatal("hardcoded listen port leaked onto the host")
@@ -99,7 +99,7 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	if err := CompilePublicConnect(ctx, client); err != nil {
 		t.Fatal(err)
 	}
-	pub := exec.Command(client)
+	pub := LaunchCmd(client)
 	pub.Env = Environ(os.Environ(), dir)
 	out, err := pub.CombinedOutput()
 	if err != nil {
@@ -204,7 +204,7 @@ func startRemappedHTTP(t *testing.T, ctx context.Context, listen int) remappedHT
 	if err := CompileHTTPServer(ctx, server); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(server, strconv.Itoa(listen))
+	cmd := LaunchCmd(server, strconv.Itoa(listen))
 	cmd.Dir = dir
 	cmd.Env = Environ(os.Environ(), dir)
 	if err := cmd.Start(); err != nil {
@@ -212,7 +212,7 @@ func startRemappedHTTP(t *testing.T, ctx context.Context, listen int) remappedHT
 	}
 	if !httpOK(t, host) {
 		_ = cmd.Process.Kill()
-		t.Fatalf("server on host %d did not become ready", host)
+		t.Fatalf("server on host %d did not become ready; listenBusy=%v table=%q", host, !portFree(listen), tableDump(dir))
 	}
 	return remappedHTTP{cmd: cmd, host: host}
 }
@@ -253,4 +253,12 @@ func portFree(port int) bool {
 	}
 	_ = ln.Close()
 	return true
+}
+
+func tableDump(worktree string) string {
+	data, err := os.ReadFile(TablePath(worktree))
+	if err != nil {
+		return err.Error()
+	}
+	return strings.TrimSpace(string(data))
 }

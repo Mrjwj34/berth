@@ -376,14 +376,17 @@ func (a *App) Run(ctx context.Context, slug string, argv []string) error {
 		return err
 	}
 	env := workspaceEnv(cfg, ws)
+	name, args := argv[0], argv[1:]
 	if cfg.IsolateNet() {
 		if _, err := remap.EnsureLib(ctx); err == nil {
 			env = remap.ApplyMap(env, ws.Path)
+			args = append([]string{argv[0]}, argv[1:]...)
+			name = remap.LaunchPath()
 		}
 	}
 	merged := config.Environ(os.Environ(), env)
 	_ = a.touch(ctx, ws.Path)
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = ws.Path
 	cmd.Env = merged
 	cmd.Stdin = os.Stdin

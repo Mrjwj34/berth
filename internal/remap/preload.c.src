@@ -35,6 +35,10 @@ static void load_reals(void) {
 	real_getpeername = (int (*)(int, struct sockaddr *, socklen_t *))dlsym(RTLD_NEXT, "getpeername");
 }
 
+__attribute__((constructor)) static void lane_remap_init(void) {
+	load_reals();
+}
+
 static const char *table_path(void) {
 	const char *p = getenv("LANE_REMAP_FILE");
 	if (p && p[0])

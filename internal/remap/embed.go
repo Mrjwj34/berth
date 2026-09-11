@@ -11,6 +11,9 @@ var preloadSrc string
 //go:embed wrap.c.src
 var wrapSrc string
 
+//go:embed launch.c.src
+var launchSrc string
+
 func libName() string {
 	if runtime.GOOS == "darwin" {
 		return "liblane_remap.dylib"

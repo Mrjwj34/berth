@@ -148,7 +148,10 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 	}
 	maps := []remap.Mapping{{Name: "api", Host: host, Listen: listen}}
 	if err := Up(ctx, dir, env, 0, maps, true); err != nil {
-		t.Fatal(err)
+		if data, rerr := os.ReadFile(LogFile(dir)); rerr == nil {
+			t.Fatalf("%v\nprocess-compose.log:\n%s\nsocket=%s (%d bytes)", err, data, Socket(dir), len(Socket(dir)))
+		}
+		t.Fatalf("%v\nsocket=%s (%d bytes)", err, Socket(dir), len(Socket(dir)))
 	}
 	defer func() { _ = Down(ctx, dir) }()
 	url := fmt.Sprintf("http://127.0.0.1:%d/", host)
@@ -169,4 +172,22 @@ func TestUpHardcodedListenPublished(t *testing.T) {
 		time.Sleep(80 * time.Millisecond)
 	}
 	t.Fatalf("published port %s: %v", url, last)
+}
+
+func TestSocketShortensLongPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows uses a tcp port, not a unix socket")
+	}
+	long := strings.Repeat("w", 160)
+	s := Socket(long)
+	if len(s) >= maxUnixSocketPath {
+		t.Fatalf("socket still too long: %d %s", len(s), s)
+	}
+	if !strings.HasPrefix(s, "/tmp/lnpc-") {
+		t.Fatalf("expected hashed /tmp socket, got %s", s)
+	}
+	short := "/tmp/ln"
+	if got := Socket(short); got != filepath.Join(config.LaneDir(short), "pc.sock") {
+		t.Fatalf("short worktree should keep in-tree socket: %s", got)
+	}
 }

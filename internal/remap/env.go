@@ -11,7 +11,11 @@ import (
 const (
 	envFile = "LANE_REMAP_FILE"
 	envOn   = "LANE_REMAP"
+	envLib  = "LANE_REMAP_LIB"
 )
+
+// EnvOn is set on remapped process environments.
+const EnvOn = envOn
 
 // EnvVars are injected into process-compose and `lane run` so bind/connect remap.
 func EnvVars(worktree string) map[string]string {
@@ -19,6 +23,7 @@ func EnvVars(worktree string) map[string]string {
 	out := map[string]string{
 		envOn:   "1",
 		envFile: TablePath(worktree),
+		envLib:  LibPath(),
 	}
 	switch runtime.GOOS {
 	case "linux":

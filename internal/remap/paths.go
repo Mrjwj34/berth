@@ -7,8 +7,9 @@ import (
 	"github.com/Mrjwj34/lane/internal/home"
 )
 
-func LibPath() string  { return filepath.Join(home.BinDir(), libName()) }
-func WrapPath() string { return filepath.Join(home.BinDir(), "lane-remap-wrap") }
+func LibPath() string    { return filepath.Join(home.BinDir(), libName()) }
+func WrapPath() string   { return filepath.Join(home.BinDir(), "lane-remap-wrap") }
+func LaunchPath() string { return filepath.Join(home.BinDir(), "lane-remap-launch") }
 
 func TablePath(worktree string) string {
 	return filepath.Join(config.LaneDir(worktree), "remap.txt")
