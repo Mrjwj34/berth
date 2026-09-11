@@ -71,10 +71,6 @@ func PortFile(worktree string) string {
 	return filepath.Join(filepath.Dir(Socket(worktree)), "pc.port")
 }
 
-func Render(worktree string, processes map[string]any, env map[string]string) error {
-	return RenderAt(worktree, worktree, processes, env)
-}
-
 // RenderAt keeps host paths out of configurations executed inside a runtime.
 func RenderAt(worktree, workingDir string, processes map[string]any, env map[string]string) error {
 	if len(processes) == 0 {
@@ -368,10 +364,6 @@ func IsRunning(ctx context.Context, worktree string) (bool, error) {
 		return false, fmt.Errorf("process state unknown; inspect %s: %w", LogFile(worktree), err)
 	}
 	return true, nil
-}
-func Running(ctx context.Context, worktree string) bool {
-	running, err := IsRunning(ctx, worktree)
-	return err == nil && running
 }
 
 func TokenFile(worktree string) string {

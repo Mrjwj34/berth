@@ -28,7 +28,7 @@ func TestRenderExpandsAndInjectsEnv(t *testing.T) {
 		},
 	}
 	env := map[string]string{"LANE_PORT_WEB": "20123", "LANE_WORKSPACE": dir}
-	if err := Render(dir, procs, env); err != nil {
+	if err := RenderAt(dir, dir, procs, env); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(PCFile(dir))
@@ -82,7 +82,7 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 			"command": python + " -m http.server ${LANE_PORT_WEB} --bind 127.0.0.1",
 		},
 	}
-	if err := Render(dir, procs, env); err != nil {
+	if err := RenderAt(dir, dir, procs, env); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
@@ -121,8 +121,8 @@ func TestUpDownSimpleHTTP(t *testing.T) {
 		t.Logf("control endpoint=%s; query=%v; output=%s", Socket(dir), debugErr, out)
 		t.Fatal(err)
 	}
-	if !Running(ctx, dir) {
-		t.Fatal("expected running")
+	if running, err := IsRunning(ctx, dir); err != nil || !running {
+		t.Fatalf("expected running, got %v (err: %v)", running, err)
 	}
 	st, err := Status(ctx, dir)
 	if err != nil {

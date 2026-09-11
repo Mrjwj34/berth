@@ -196,33 +196,3 @@ func RelativePath(p string) error {
 	}
 	return nil
 }
-
-// Find walks from startDir toward the filesystem root looking for lane.yaml.
-// Missing file is not an error: L0 repos work with defaults.
-func Find(startDir string) (cfg *Config, root string, err error) {
-	dir, err := filepath.Abs(startDir)
-	if err != nil {
-		return nil, "", err
-	}
-	for {
-		path := filepath.Join(dir, Filename)
-		if st, err := os.Stat(path); err == nil && !st.IsDir() {
-			cfg, err := Load(path)
-			if err != nil {
-				return nil, "", err
-			}
-			return cfg, dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			d := Defaults()
-			return &d, startDir, nil
-		}
-		dir = parent
-	}
-}
-
-func Exists(root string) bool {
-	st, err := os.Stat(filepath.Join(root, Filename))
-	return err == nil && !st.IsDir()
-}

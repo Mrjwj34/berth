@@ -27,6 +27,49 @@ Build/install dependencies once per image rather than every run where possible.
 Use workspace-private data. Copying mutable dependencies uses CoW/plain copy, not
 hardlinks. External symlinks and absolute shared storage need explicit treatment.
 
+## Configuration Examples
+
+### Native: Web App with Postgres Dependency
+```yaml
+version: 1
+base: main
+ports: [web, pg]
+env:
+  DATABASE_URL: postgres://127.0.0.1:${LANE_PORT_PG}/app
+hooks:
+  setup:
+    - mkdir -p "$LANE_DATA_DIR/pg"
+    - test -d "$LANE_DATA_DIR/pg/base" || initdb -D "$LANE_DATA_DIR/pg" --no-locale --encoding=UTF8
+processes:
+  pg:
+    command: postgres -D "$LANE_DATA_DIR/pg" -p "$LANE_PORT_PG" -k "$LANE_DATA_DIR"
+    readiness_probe:
+      exec:
+        command: pg_isready -h 127.0.0.1 -p "$LANE_PORT_PG"
+  web:
+    command: npm run dev -- --port "$LANE_PORT_WEB"
+    readiness_probe:
+      http_get: {host: 127.0.0.1, port: "${LANE_PORT_WEB}", path: /}
+```
+
+### Container: Fixed/Hardcoded Listen Port (e.g. 8080)
+```yaml
+version: 1
+base: main
+runtime:
+  backend: container
+  engine: docker
+  image: lane-runtime:local
+ports: [web]
+listen:
+  web: 8080
+processes:
+  web:
+    command: python3 -m http.server 8080 --bind 127.0.0.1
+    readiness_probe:
+      http_get: {host: 127.0.0.1, port: 8080, path: /}
+```
+
 ## Execute
 
 ```sh

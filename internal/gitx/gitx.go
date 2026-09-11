@@ -68,23 +68,3 @@ func Has(ctx context.Context) error {
 	_, err := Run(ctx, "", "version")
 	return err
 }
-
-func IsInsideWorkTree(ctx context.Context, dir string) bool {
-	out, err := Run(ctx, dir, "rev-parse", "--is-inside-work-tree")
-	return err == nil && out == "true"
-}
-
-func DefaultBranch(ctx context.Context, dir string) string {
-	for _, name := range []string{"main", "master"} {
-		if _, err := Run(ctx, dir, "rev-parse", "--verify", name); err == nil {
-			return name
-		}
-		if _, err := Run(ctx, dir, "rev-parse", "--verify", "origin/"+name); err == nil {
-			return name
-		}
-	}
-	if b, err := CurrentBranch(ctx, dir); err == nil && b != "HEAD" {
-		return b
-	}
-	return "main"
-}
