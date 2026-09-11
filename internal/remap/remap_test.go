@@ -85,7 +85,11 @@ func TestPreloadBindAndPublicConnect(t *testing.T) {
 	srv := startLaunched(t, dir, server, listen)
 	defer srv.stop()
 	if !httpOK(t, host) {
-		t.Fatalf("published %d did not serve; listenBusy=%v table=%q exited=%v stderr=%q", host, !portFree(listen), tableDump(dir), srv.exitStatus(), srv.stderr.String())
+		pid := 0
+		if srv.cmd != nil && srv.cmd.Process != nil {
+			pid = srv.cmd.Process.Pid
+		}
+		t.Fatalf("published %d did not serve; listenBusy=%v table=%q exited=%v stderr=%q sockets=%q", host, !portFree(listen), tableDump(dir), srv.exitStatus(), srv.stderr.String(), childSockets(pid))
 	}
 	if !portFree(listen) {
 		t.Fatal("hardcoded listen port leaked onto the host")
@@ -261,8 +265,13 @@ func startRemappedHTTP(t *testing.T, ctx context.Context, listen int) remappedHT
 	if !httpOK(t, host) {
 		st := srv.exitStatus()
 		errBuf := srv.stderr.String()
+		pid := 0
+		if srv.cmd != nil && srv.cmd.Process != nil {
+			pid = srv.cmd.Process.Pid
+		}
+		socks := childSockets(pid)
 		srv.stop()
-		t.Fatalf("server on host %d did not become ready; listenBusy=%v table=%q exited=%s stderr=%q", host, !portFree(listen), tableDump(dir), st, errBuf)
+		t.Fatalf("server on host %d did not become ready; listenBusy=%v table=%q exited=%s stderr=%q sockets=%q", host, !portFree(listen), tableDump(dir), st, errBuf, socks)
 	}
 	return remappedHTTP{srv: srv, host: host}
 }
@@ -311,4 +320,18 @@ func tableDump(worktree string) string {
 		return err.Error()
 	}
 	return strings.TrimSpace(string(data))
+}
+
+func childSockets(pid int) string {
+	if pid <= 0 {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "lsof", "-nP", "-p", strconv.Itoa(pid), "-a", "-iTCP").CombinedOutput()
+	s := strings.TrimSpace(string(out))
+	if err != nil && s == "" {
+		return err.Error()
+	}
+	return s
 }
