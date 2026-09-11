@@ -375,7 +375,7 @@ func Running(ctx context.Context, worktree string) bool {
 }
 
 func TokenFile(worktree string) string {
-	return filepath.Join(filepath.Dir(Socket(worktree)), "api.token")
+	return strings.TrimSuffix(Socket(worktree), ".sock") + ".token"
 }
 func ensureToken(worktree string) error {
 	path := TokenFile(worktree)

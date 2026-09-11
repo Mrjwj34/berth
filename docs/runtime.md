@@ -32,6 +32,10 @@ runtime.user override matching its user namespace.
 `up` waits for declared health probes to report ready. A running process without
 a probe is accepted as started; this does not guarantee its application endpoint
 is ready. Declare a readiness probe when dependent commands need that guarantee.
+Allow for cold startup in the probe's initial delay and failure threshold:
+process-compose stops a process when its readiness failure threshold is reached
+(three failures by default). Native `up` has a 60-second readiness deadline;
+raising the probe threshold does not remove that deadline or bypass readiness.
 
 `ports` names host publications. `listen` specifies their original TCP port in
 container mode. Every named port requires a listen value. Internal services can

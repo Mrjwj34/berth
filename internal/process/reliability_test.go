@@ -45,6 +45,17 @@ func TestClientArgumentsNeverUseDefaultEndpoint(t *testing.T) {
 	}
 }
 
+func TestControlFilesAreWorkspaceScoped(t *testing.T) {
+	for _, suffix := range []string{"short", strings.Repeat("long", 30)} {
+		t.Setenv("LANE_HOME", filepath.Join(t.TempDir(), suffix))
+		root := t.TempDir()
+		a, b := filepath.Join(root, "alpha"), filepath.Join(root, "beta")
+		if Socket(a) == Socket(b) || TokenFile(a) == TokenFile(b) {
+			t.Fatal("parallel workspaces share a control endpoint or authentication file")
+		}
+	}
+}
+
 func TestUnknownAndFailedAreNotReady(t *testing.T) {
 	for _, raw := range []string{`[{"name":"web","status":"Running","is_ready":"Unknown"}]`, `[{"name":"web","status":"Completed","exit_code":1,"is_ready":"N/A"}]`, `[]`} {
 		p, err := DecodeStatus([]byte(raw))
