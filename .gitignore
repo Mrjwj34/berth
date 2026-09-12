@@ -20,3 +20,8 @@
 .vscode/
 .idea/
 tmp/
+
+# Python bytecode from the validation harness
+__pycache__/
+*.pyc
+
