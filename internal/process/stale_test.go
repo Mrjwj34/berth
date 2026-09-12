@@ -186,9 +186,11 @@ func freePort(t *testing.T) int {
 // deadPID returns a process identifier that is certainly no longer running.
 func deadPID(t *testing.T) int {
 	t.Helper()
-	name, args := "/bin/true", []string(nil)
-	if runtime.GOOS == "windows" {
-		name, args = "cmd", []string{"/c", "exit"}
+	name, args := "cmd", []string{"/c", "exit"}
+	if runtime.GOOS != "windows" {
+		// /bin/true does not exist on macOS, and `true` is a shell builtin
+		// there, so run the shell itself.
+		name, args = "sh", []string{"-c", "exit 0"}
 	}
 	cmd := exec.Command(name, args...)
 	if err := cmd.Run(); err != nil {
