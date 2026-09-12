@@ -29,6 +29,7 @@ from datetime import datetime
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import statistics
@@ -297,13 +298,27 @@ class Harness:
             notes.append(text)
             self.report["environment"]["container_notes"] = notes
 
+    MEMORY_SCALE = {"B": 1, "b": 1, "kB": 1000, "KB": 1000, "MB": 1000 ** 2, "GB": 1000 ** 3,
+                    "KiB": 1024, "MiB": 1024 ** 2, "GiB": 1024 ** 3, "": 1}
+
+    @staticmethod
+    def parse_mem(text: str) -> int | None:
+        """Parse docker's memory strings, which include 0B and 12.5MiB."""
+        match = re.match(r"\s*([0-9.]+)\s*([A-Za-z]*)\s*$", (text or "").split("/")[0])
+        if not match:
+            return None
+        value, unit = float(match.group(1)), match.group(2)
+        if unit not in Harness.MEMORY_SCALE:
+            return None
+        return int(value * Harness.MEMORY_SCALE[unit])
+
     def container_mem_bytes(self, path: str) -> int | None:
         """Whole-container memory.
 
         The native RSS sample reads host PIDs, and a workspace whose processes
         live inside a container has none, so this is the only comparable memory
-        number in container mode. When neither the engine nor the cgroup answers,
-        the reason is recorded instead of leaving a silent gap.
+        number in container mode. Three sources are tried, and the reason is
+        recorded when none of them answers, so a gap is never silent.
         """
         if self.mode != "container":
             return None
@@ -311,18 +326,35 @@ class Harness:
         if identity is None:
             return None
         name = f"berth-{identity}"
-        scale = {"B": 1, "kB": 1000, "KiB": 1024, "MB": 1000 ** 2, "MiB": 1024 ** 2,
-                 "GB": 1000 ** 3, "GiB": 1024 ** 3}
+
         try:
             out = subprocess.run([self.args.engine, "stats", "--no-stream", "--format", "{{.MemUsage}}", name],
                                  capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", timeout=90)
-            if out.returncode == 0 and "/" in out.stdout:
-                value, unit = out.stdout.split("/")[0].strip().split(" ")
-                return int(float(value) * scale[unit.strip()])
-            self.container_note(f"docker stats {name}: {(out.stderr or out.stdout).strip()[:160]}")
+            if out.returncode == 0:
+                parsed = self.parse_mem(out.stdout)
+                if parsed:
+                    return parsed
+                self.container_note(f"docker stats {name} reported {out.stdout.strip()!r}; "
+                                    f"falling back to the container's own cgroup")
+            else:
+                self.container_note(f"docker stats {name}: {(out.stderr or out.stdout).strip()[:160]}")
         except Exception as error:
             self.container_note(f"docker stats {name}: {error}")
+
+        # Reading the cgroup through the container avoids every host-layout
+        # question: the file path inside a container is stable across engines.
+        for candidate in ("/sys/fs/cgroup/memory.current",
+                          "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
+            try:
+                out = subprocess.run([self.args.engine, "exec", name, "cat", candidate],
+                                     capture_output=True, text=True, encoding="utf-8",
+                                     errors="replace", timeout=60)
+                if out.returncode == 0 and out.stdout.strip().isdigit():
+                    return int(out.stdout.strip())
+            except Exception:
+                continue
+
         for candidate in (Path(f"/sys/fs/cgroup/system.slice/docker-{identity}.scope/memory.current"),
                           Path(f"/sys/fs/cgroup/docker/{identity}/memory.current")):
             try:
@@ -330,6 +362,7 @@ class Harness:
                     return int(candidate.read_text().strip())
             except OSError:
                 continue
+        self.container_note(f"container memory for {name}: engine, in-container cgroup and host cgroup all silent")
         return None
 
     def container_start_ms(self, path: str) -> float | None:
