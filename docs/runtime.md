@@ -145,7 +145,23 @@ checkout while processes still hold it.
 
 The control files are not inside the workspace. On Windows they live under
 `BERTH_HOME/run/<hash>/` as `pc.port` and `pc.token`; on Unix the socket is
-`<workspace>/.berth/pc.sock` with a `pc.token` beside it. When no
+`<workspace>/.berth/pc.sock` with a `pc.token` beside it.
+
+A supervisor that exits on its own — a project that completed, or a process that
+failed during startup — leaves those files behind, because only a successful
+conversation with the supervisor removed them. berth reclaims them rather than
+staying unknown forever, but only when the departure is proven: the recorded
+endpoint is still usable and nothing answers on it, and no process that berth
+started is still alive. The reclamation is reported on stderr, and the workspace
+counts as stopped afterwards.
+
+On Windows berth records the supervisor it started in `pc.pid` and drops that
+file once the supervisor answers, so a start that is still in flight is never
+mistaken for a departed supervisor, and a dead recorded PID never keeps the state
+unknown.
+
+What stays unknown still needs you: a supervisor that accepts connections without
+answering, and a control file that names no usable endpoint. When no
 `process-compose` is running for that workspace, remove the stale pair, then
 retry `down` and `done`. `pc.yaml`, `data` and the checkout are untouched by that
 cleanup.
