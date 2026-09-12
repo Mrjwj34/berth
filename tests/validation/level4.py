@@ -54,12 +54,12 @@ def clone(spec: dict, target: Path, env: dict) -> tuple[bool, str]:
     if spec.get("branch"):
         args += ["--branch", spec["branch"]]
     args += [spec["repo"], str(target)]
-    result = subprocess.run(args, capture_output=True, text=True, timeout=1800, env=env)
+    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800, env=env)
     if result.returncode == 0:
         return True, ""
     # Private repository: fall back to the authenticated gh client.
     gh = subprocess.run(["gh", "repo", "clone", spec["repo"], str(target), "--", "--depth", "1"],
-                        capture_output=True, text=True, timeout=1800, env=env)
+                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800, env=env)
     if gh.returncode == 0:
         return True, "cloned with gh credentials"
     return False, (result.stderr + gh.stderr).strip()[:600]
@@ -158,8 +158,16 @@ def run_level4(harness, checks) -> dict:
     resources["supervised_processes"] = count
     resources["supervised_rss_kb"] = rss_kb(pids)
 
+    released = []
     for workspace in created:
         harness.release(repo, workspace["slug"])
-    checks.that("workspaces released after the run",
-                not harness.created, f"still registered: {harness.created}")
+        released.append(not any(slug == workspace["slug"] for _, slug in harness.created))
+    checks.that("every workspace is released after the business commands",
+                all(released), f"still registered: {[slug for _, slug in harness.created]}")
+    if not all(released):
+        notes.append("DEFECT: a workspace could not be released. Git refused to delete the "
+                     "checkout (a real dependency tree is large) and berth deliberately does "
+                     "not fall back to a recursive delete, so the workspace stays pending "
+                     "removal and berth run refuses to enter it.")
+        notes.append("cleanup: " + harness.cleanup_stuck_repo(repo))
     return {"checks": checks.rows, "timings_ms": timings, "resources": resources, "notes": notes}

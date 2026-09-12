@@ -110,7 +110,7 @@ def rss_kb(pids: list[int]) -> int:
     if os.name == "nt":
         for pid in pids:
             out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                                 capture_output=True, text=True).stdout.strip()
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
             parts = [p.strip('"') for p in out.split('","')]
             if len(parts) >= 5 and parts[-1].endswith("K"):
                 total += int(parts[-1].rstrip("K").replace(",", "").replace(".", ""))
@@ -178,8 +178,8 @@ class Harness:
     def supervisor_running(self) -> bool:
         name = "process-compose.exe" if os.name == "nt" else "process-compose"
         listing = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {name}", "/NH"],
-                                 capture_output=True, text=True).stdout if os.name == "nt" else \
-            subprocess.run(["pgrep", "-x", name], capture_output=True, text=True).stdout
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace").stdout if os.name == "nt" else \
+            subprocess.run(["pgrep", "-x", name], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         return name in listing
 
     def clear_stale_control_files(self) -> int:
@@ -203,6 +203,36 @@ class Harness:
                     continue
         return removed
 
+    def cleanup_stuck_repo(self, repo: Path) -> str:
+        """Best-effort recovery for a checkout Git could not delete.
+
+        `berth done` refuses to fall back to a recursive delete once
+        `git worktree remove` fails, which is deliberate, so a heavy checkout
+        (a real node_modules tree, for example) can be left pending removal:
+        unusable for `berth run` and not removable by the CLI either. The
+        harness records that as a defect and then cleans its own scratch so the
+        next run starts from a known state.
+        """
+        subprocess.run(["git", "worktree", "prune"], cwd=str(repo), env=self.env,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+        self.clear_stale_control_files()
+
+        def onerror(func, path, _exc):
+            try:
+                os.chmod(path, 0o700)
+                func(path)
+            except OSError:
+                pass
+
+        removed = 0
+        for leftover in sorted(repo.parent.glob(f"{repo.name}.berths/*")):
+            shutil.rmtree(leftover, onerror=onerror)
+            if not leftover.exists():
+                removed += 1
+        remaining = [p.name for p in repo.parent.glob(f"{repo.name}.berths/*")]
+        return (f"removed {removed} leftover workspace directories; remaining {remaining}; "
+                f"run berth gc to clear the registrations")
+
     def release(self, repo: Path, slug: str) -> None:
         result = self.cli("done", slug, "--force", cwd=repo, timeout=180)
         if result.returncode and "process state unknown" in (result.stdout + result.stderr):
@@ -214,7 +244,7 @@ class Harness:
     # --- process helpers -------------------------------------------------
     def cli(self, *argv, cwd: Path | None = None, timeout: float = 300) -> subprocess.CompletedProcess:
         return subprocess.run([self.berth, *argv], cwd=str(cwd or self.root), env=self.env,
-                              capture_output=True, text=True, timeout=timeout)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
     def cli_json(self, *argv, cwd: Path | None = None, timeout: float = 300) -> dict:
         started = now_ms()
@@ -226,7 +256,7 @@ class Harness:
 
     def git(self, *argv, cwd: Path) -> None:
         subprocess.run(["git", *argv], cwd=str(cwd), env=self.env, check=True,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
 
     def make_repo(self, level: str) -> Path:
         # A directory per run: Git marks loose objects read-only on Windows, so a
@@ -261,7 +291,7 @@ class Harness:
         except Exception:
             return None
         out = subprocess.run([self.args.engine, "stats", "--no-stream", "--format", "{{.MemUsage}}",
-                              f"berth-{identity}"], capture_output=True, text=True).stdout.strip()
+                              f"berth-{identity}"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
         try:
             value, unit = out.split("/")[0].strip().split(" ")
             scale = {"B": 1, "KiB": 1024, "MiB": 1024 ** 2, "GiB": 1024 ** 3}[unit]

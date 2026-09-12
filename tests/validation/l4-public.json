@@ -1,6 +1,7 @@
 {
   "name": "gin",
   "repo": "https://github.com/gin-gonic/gin",
+  "base": "master",
   "setup": [],
   "checks": [
     {"name": "go build ./...", "cmd": ["go", "build", "./..."]},

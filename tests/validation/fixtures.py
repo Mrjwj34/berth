@@ -343,7 +343,13 @@ print("sqlite file present:", os.path.exists(STORE), file=os.sys.stderr)
 
 def write_repo(level: str, repo: Path, python: str, image: str | None, engine: str = "docker",
                listen_base: int = 0) -> None:
-    """Write one fixture into repo. image/engine are only used in container mode."""
+    """Write one fixture into repo.
+
+    In container mode every declared port needs a `listen` mapping: the runtime
+    publishes the host port and forwards it to the port the program actually
+    binds inside the container. Host access always uses the host port that the
+    CLI reports, so the assertions are identical in both runtimes.
+    """
     runtime = ""
     listen = ""
     if image:
@@ -352,6 +358,12 @@ def write_repo(level: str, repo: Path, python: str, image: str | None, engine: s
   engine: {engine}
   image: {image}
 """
+        internal = {
+            "l1": {"web": 8080},
+            "l2": {"backend": 8081, "frontend": 8080},
+            "l3": {"db": 8082, "api": 8083},
+        }[level]
+        listen = "listen:\n" + "".join(f"  {name}: {port}\n" for name, port in internal.items())
     if level == "l1":
         (repo / "app.py").write_text(L1_APP)
         (repo / "setup.py").write_text(L1_SETUP)
