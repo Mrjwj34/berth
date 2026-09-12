@@ -1,0 +1,142 @@
+name: validation
+
+# End-to-end validation of real business behaviour in both runtimes. The
+# acceptance tests in ci.yml prove the runtime contract; this workflow proves
+# that projects of increasing complexity actually work, and records the
+# performance numbers next to the correctness evidence.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'runtime/**'
+      - 'tests/validation/**'
+      - '.github/workflows/validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: native (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          go build -o berth${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/berth
+
+      - name: Install pinned native supervisor
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BERTH_HOME="${RUNNER_TEMP}/berth-tools"
+          go run ./cmd/berth doctor --fix
+          echo "$BERTH_HOME/bin/process-compose-v1.122.0" >> "$GITHUB_PATH"
+
+      - name: Validate every level
+        shell: bash
+        env:
+          BERTH_HOME: ${{ runner.temp }}/berth-home
+        run: |
+          set -euo pipefail
+          mkdir -p "$BERTH_HOME"
+          python tests/validation/harness.py \
+            --berth ./berth${{ runner.os == 'Windows' && '.exe' || '' }} \
+            --mode native --levels l1,l2,l3,l4 \
+            --l4-json tests/validation/l4-public.json \
+            --out "native-${{ runner.os }}.json" \
+            --markdown "native-${{ runner.os }}.md"
+
+      - name: Summarise
+        if: always()
+        shell: bash
+        run: cat "native-${{ runner.os }}.md" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-native-${{ runner.os }}
+          path: |
+            native-${{ runner.os }}.json
+            native-${{ runner.os }}.md
+
+  container:
+    name: container (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Build
+        run: go build -o berth ./cmd/berth
+
+      - name: Build the shared runtime image once
+        run: docker build -t berth-runtime:test -f runtime/Dockerfile .
+
+      - name: Build the Go runtime image for level 4
+        run: docker build -t berth-runtime-golang:test --build-arg BASE_IMAGE=golang:1.25-bookworm -f runtime/Dockerfile .
+
+      - name: Validate every level inside one container per workspace
+        env:
+          BERTH_HOME: ${{ runner.temp }}/berth-home
+        run: |
+          set -euo pipefail
+          mkdir -p "$BERTH_HOME"
+          python3 tests/validation/harness.py \
+            --berth ./berth --mode container --image berth-runtime:test \
+            --levels l1,l2,l3,l4 --l4-json tests/validation/l4-public.json \
+            --out container-linux.json --markdown container-linux.md
+
+      - name: Container facts for the report
+        if: always()
+        run: |
+          {
+            echo "## container facts"
+            echo
+            echo "| fact | value |"
+            echo "| --- | --- |"
+            echo "| runtime image | $(docker image inspect berth-runtime:test --format '{{.Size}}' 2>/dev/null || echo unknown) bytes |"
+            echo "| go runtime image | $(docker image inspect berth-runtime-golang:test --format '{{.Size}}' 2>/dev/null || echo unknown) bytes |"
+            echo "| engine version | $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo unknown) |"
+          } >> container-linux.md
+
+      - name: Summarise
+        if: always()
+        run: cat container-linux.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-container-linux
+          path: |
+            container-linux.json
+            container-linux.md

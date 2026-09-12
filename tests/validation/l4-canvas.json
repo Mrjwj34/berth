@@ -1,0 +1,13 @@
+{
+  "name": "canvas",
+  "repo": "https://github.com/qbox/canvas",
+  "base": "dev",
+  "setup": ["pnpm --dir frontend install --frozen-lockfile"],
+  "checks": [
+    {"name": "go build ./...", "cmd": ["go", "build", "./..."]},
+    {"name": "frontend typecheck (tsc --noEmit)", "cmd": ["npm", "--prefix", "frontend", "run", "check"]},
+    {"name": "frontend unit tests (vitest)", "cmd": ["npm", "--prefix", "frontend", "run", "test:run"]},
+    {"name": "go test ./internal/...", "cmd": ["go", "test", "./internal/..."], "allow_failure": true}
+  ],
+  "parallel_workspaces": 2
+}

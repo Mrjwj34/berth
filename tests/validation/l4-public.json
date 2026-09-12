@@ -1,0 +1,11 @@
+{
+  "name": "gin",
+  "repo": "https://github.com/gin-gonic/gin",
+  "setup": [],
+  "checks": [
+    {"name": "go build ./...", "cmd": ["go", "build", "./..."]},
+    {"name": "go test ./...", "cmd": ["go", "test", "./..."]}
+  ],
+  "container_image": "berth-runtime-golang:test",
+  "parallel_workspaces": 2
+}
