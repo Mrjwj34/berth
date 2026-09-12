@@ -128,7 +128,13 @@ def run_level4(harness, checks) -> dict:
 
     # The business commands, run through berth run so they see the workspace
     # runtime, environment and data directory.
+    host = platform.system().lower()
     for check in spec["checks"]:
+        skip = (check.get("skip_on") or {}).get(host)
+        if skip:
+            checks.that(f"{check['name']} is not applicable on {host} (informational)", True, skip)
+            notes.append(f"SKIPPED on {host}: {check['name']} — {skip}")
+            continue
         started = now_ms()
         result = harness.cli("run", "--", *check["cmd"], cwd=primary, timeout=harness.args.l4_timeout)
         elapsed = round(now_ms() - started, 2)
