@@ -1,0 +1,304 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-12T05:46:37Z",
+  "mode": "native",
+  "levels": {
+    "l1": {
+      "duration_ms": 46308.44,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "workspace reports itself ready",
+          "ok": true,
+          "detail": "ports={'pc': 20017, 'web': 20016}"
+        },
+        {
+          "name": "no tracked file is dirty right after creation",
+          "ok": true,
+          "detail": "dirty=False"
+        },
+        {
+          "name": "health reports the workspace slug",
+          "ok": true,
+          "detail": "got 'alpha', want 'alpha'"
+        },
+        {
+          "name": "create returns three stored items",
+          "ok": true,
+          "detail": "got 3, want 3"
+        },
+        {
+          "name": "listing returns the exact three payloads",
+          "ok": true,
+          "detail": "got [('a1', 'widget', 3), ('a2', 'gadget', 5), ('a3', 'sprocket', 7)], want [('a1', 'widget', 3), ('a2', 'gadget', 5), ('a3', 'sprocket', 7)]"
+        },
+        {
+          "name": "single read round-trips the stored value",
+          "ok": true,
+          "detail": "got ('gadget', 5), want ('gadget', 5)"
+        },
+        {
+          "name": "update is visible through the aggregate endpoint",
+          "ok": true,
+          "detail": "got (3, ['gadget', 'sprocket', 'widget']), want (3, ['gadget', 'sprocket', 'widget'])"
+        },
+        {
+          "name": "delete removes exactly one item",
+          "ok": true,
+          "detail": "got 2, want 2"
+        },
+        {
+          "name": "deleted item is gone",
+          "ok": true,
+          "detail": "got 404, want 404"
+        },
+        {
+          "name": "down releases the published port",
+          "ok": true,
+          "detail": "port 20016 still open"
+        },
+        {
+          "name": "up makes the service reachable again",
+          "ok": true,
+          "detail": "service did not come back"
+        },
+        {
+          "name": "private data survives down/up",
+          "ok": true,
+          "detail": "got 2, want 2"
+        },
+        {
+          "name": "reset makes the service reachable again",
+          "ok": true,
+          "detail": "service did not come back after reset"
+        },
+        {
+          "name": "reset wipes private data",
+          "ok": true,
+          "detail": "got 0, want 0"
+        },
+        {
+          "name": "four parallel workspaces get four distinct ports",
+          "ok": true,
+          "detail": "got 4, want 4"
+        },
+        {
+          "name": "each parallel workspace sees only its own data",
+          "ok": true,
+          "detail": "got [['beta'], ['gamma'], ['delta'], ['epsilon']], want [['beta'], ['gamma'], ['delta'], ['epsilon']]"
+        },
+        {
+          "name": "the first workspace is unaffected by the others",
+          "ok": true,
+          "detail": "got 0, want 0"
+        },
+        {
+          "name": "berth run preserves argv characters verbatim",
+          "ok": true,
+          "detail": "got \"spaces 'quotes' $HOME & pipes|\", want \"spaces 'quotes' $HOME & pipes|\""
+        },
+        {
+          "name": "copy_dirs materialises the dependency tree",
+          "ok": true,
+          "detail": "missing <home>\\appdata\\local\\temp\\berthval\\l1-project-134637.berths\\cow\\deps\\blob-0.bin"
+        },
+        {
+          "name": "writing into a copied tree does not change the source",
+          "ok": true,
+          "detail": "source tree was modified"
+        }
+      ],
+      "timings_ms": {
+        "new_and_up_ms": 4233.631799995899,
+        "status_ms": 1771.28,
+        "ports_ms": 1758.34,
+        "plan_ms": 205.41,
+        "ls_ms": 3621.87,
+        "down_ms": 1746.48,
+        "up_again_ms": 2293.73,
+        "reset_ms": 2128.99,
+        "parallel4_new_and_up_wall_ms": 4455.27,
+        "run_plain_ms": 20.64,
+        "run_via_berth_ms": 207.26,
+        "cow_48mb_new_ms": 873.42,
+        "cow_writeback_ms": 0.38
+      },
+      "resources": {
+        "supervised_processes": 1,
+        "supervised_rss_kb": 6976,
+        "workspace_disk_kb": 37,
+        "data_dir_kb": 0,
+        "container_mem_bytes": null,
+        "cow_tree_kb": 48129
+      },
+      "notes": []
+    },
+    "l2": {
+      "duration_ms": 20980.71,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "the two declared ports differ",
+          "ok": true,
+          "detail": "20017 == 20016"
+        },
+        {
+          "name": "frontend reports the backend aggregate",
+          "ok": true,
+          "detail": "got (3, ['one', 'three', 'two']), want (3, ['one', 'three', 'two'])"
+        },
+        {
+          "name": "frontend page renders backend state",
+          "ok": true,
+          "detail": "<html><body data-slug='alpha'>count=3 names=one,three,two</body></html>"
+        },
+        {
+          "name": "services return after reset",
+          "ok": true,
+          "detail": "frontend never reported an empty backend"
+        },
+        {
+          "name": "frontend follows the backend after its data is wiped",
+          "ok": true,
+          "detail": "got 0, want 0"
+        },
+        {
+          "name": "second workspace renders its own backend",
+          "ok": true,
+          "detail": "<html><body data-slug='beta'>count=1 names=beta-only</body></html>"
+        },
+        {
+          "name": "first workspace is unaffected",
+          "ok": true,
+          "detail": "<html><body data-slug='alpha'>count=0 names=</body></html>"
+        }
+      ],
+      "timings_ms": {
+        "new_and_up_ms": 4211.0315999910235,
+        "reset_ms": 2218.53
+      },
+      "resources": {
+        "supervised_processes": 2,
+        "supervised_rss_kb": 13716,
+        "workspace_disk_kb": 71,
+        "container_mem_bytes": null
+      },
+      "notes": []
+    },
+    "l3": {
+      "duration_ms": 24834.81,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "api and db ports differ",
+          "ok": true,
+          "detail": "20017 == 20016"
+        },
+        {
+          "name": "setup hook created the schema in the database service",
+          "ok": true,
+          "detail": "tables=['orders', 'sqlite_sequence']"
+        },
+        {
+          "name": "order boltx10 accepted",
+          "ok": true,
+          "detail": "got 201, want 201"
+        },
+        {
+          "name": "order nutx20 accepted",
+          "ok": true,
+          "detail": "got 201, want 201"
+        },
+        {
+          "name": "order boltx5 accepted",
+          "ok": true,
+          "detail": "got 201, want 201"
+        },
+        {
+          "name": "SQL aggregate sums units",
+          "ok": true,
+          "detail": "got 36, want 36"
+        },
+        {
+          "name": "SQL aggregate counts rows",
+          "ok": true,
+          "detail": "got 4, want 4"
+        },
+        {
+          "name": "SQL group-by per sku",
+          "ok": true,
+          "detail": "got {'bolt': 15, 'nut': 20, 'seed': 1}, want {'bolt': 15, 'nut': 20, 'seed': 1}"
+        },
+        {
+          "name": "order listing is ordered and complete",
+          "ok": true,
+          "detail": "got [('seed', 1), ('bolt', 10), ('nut', 20), ('bolt', 5)], want [('seed', 1), ('bolt', 10), ('nut', 20), ('bolt', 5)]"
+        },
+        {
+          "name": "database contents survive down/up",
+          "ok": true,
+          "detail": "orders were not preserved across a restart"
+        },
+        {
+          "name": "reset restores the seeded schema",
+          "ok": true,
+          "detail": "reset did not return the database to its seeded state"
+        },
+        {
+          "name": "second workspace has its own database",
+          "ok": true,
+          "detail": "got (100, 2), want (100, 2)"
+        },
+        {
+          "name": "first workspace database is untouched",
+          "ok": true,
+          "detail": "got (1, 1), want (1, 1)"
+        },
+        {
+          "name": "each workspace has its own database file",
+          "ok": true,
+          "detail": "sqlite file missing in one workspace"
+        }
+      ],
+      "timings_ms": {
+        "new_migrate_up_ms": 4340.2224000021815,
+        "reset_ms": 2115.34
+      },
+      "resources": {
+        "supervised_processes": 2,
+        "supervised_rss_kb": 13772,
+        "workspace_disk_kb": 123,
+        "database_kb": 56,
+        "container_mem_bytes": null
+      },
+      "notes": []
+    }
+  },
+  "environment": {
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "cpu_count": 20,
+    "berth": "D:\\Projects\\lane\\bin\\berth.exe",
+    "image": null,
+    "engine": "docker",
+    "temp_root": "<home>\\AppData\\Local\\Temp\\berthval",
+    "doctor": {
+      "ok": true,
+      "checks": [
+        {
+          "name": "git",
+          "ok": true,
+          "detail": "git version 2.47.1.windows.2"
+        },
+        {
+          "name": "state",
+          "ok": true,
+          "detail": "<home>\\AppData\\Local\\Temp\\berthval\\berth-home\\state.json"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-12T10:34:34Z",
+  "mode": "native",
+  "levels": {
+    "l4": {
+      "ok": false,
+      "duration_ms": 538506.69,
+      "checks": [
+        {
+          "name": "external project canvas cloned",
+          "ok": true
+        },
+        {
+          "name": "every workspace checkout contains the project",
+          "ok": true
+        },
+        {
+          "name": "go build ./... succeeds inside the workspace",
+          "ok": true
+        },
+        {
+          "name": "frontend typecheck (tsc --noEmit) succeeds inside the workspace",
+          "ok": true
+        },
+        {
+          "name": "frontend unit tests (vitest) runs inside the workspace (informational)",
+          "ok": true
+        },
+        {
+          "name": "go test ./api/... runs inside the workspace (informational)",
+          "ok": true
+        },
+        {
+          "name": "the same business command succeeds in all 2 workspaces",
+          "ok": true
+        },
+        {
+          "name": "every workspace is released after the business commands",
+          "ok": false
+        }
+      ],
+      "timings_ms": {
+        "clone_ms": 8367.15,
+        "new_real1_ms": 19489.69,
+        "new_real2_ms": 19540.16,
+        "run_go build ./..._ms": 8113.09,
+        "run_frontend typecheck (tsc --noEmit)_ms": 44620.44,
+        "run_frontend unit tests (vitest)_ms": 55234.7,
+        "run_go test ./api/..._ms": 280421.66,
+        "parallel_all_workspaces_first_check_ms": 13501.72
+      },
+      "resources": {
+        "workspace_disk_mb": 1513,
+        "project_disk_mb": 133,
+        "container_mem_bytes": null,
+        "supervised_processes": 0,
+        "supervised_rss_kb": 0
+      },
+      "notes": [
+        "spec: tests/validation/l4-canvas.json",
+        "DEFECT: a workspace could not be released. Git refused to delete the checkout (a real dependency tree is large) and berth deliberately does not fall back to a recursive delete, so the workspace stays pending removal and berth run refuses to enter it.",
+        "cleanup: removed 2 leftover workspace directories; remaining []; run berth gc to clear the registrations",
+        "Business test names are not published: this report belongs to a private repository, so only measurements and assertion outcomes are recorded here."
+      ],
+      "error": null
+    }
+  },
+  "environment": {
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "cpu_count": 20,
+    "berth": "<local build>",
+    "image": null,
+    "engine": "docker",
+    "temp_root": "<temp>"
+  }
+}

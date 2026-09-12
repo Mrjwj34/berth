@@ -74,6 +74,47 @@ repository locally and a public project in CI:
 A spec contains no project code, only the repository URL, the setup hook, and
 the commands to run.
 
+## What these runs found
+
+Running projects rather than probing readiness is what produced these, so they
+are recorded here next to the numbers:
+
+1. **A container workspace whose configuration declares no ports could not be
+   used at all.** `berth new` created the container and every later command
+   refused it with `runtime ownership/configuration mismatch`. The spec hash was
+   computed from the workspace record, whose port maps serialise as `{}` while
+   empty but read back as `null` after a round trip through `state.json`
+   (`omitempty`), so the hash taken at creation never matched the hash taken at
+   inspection. Fixed in `internal/runner` with a unit test that pins both
+   directions; the container matrix passed level 4 afterwards.
+2. **A workspace holding a heavy dependency tree could not be released.** After
+   `git worktree remove` failed with `Directory not empty`, `berth done` refused
+   to fall back to a recursive delete — the documented and intended behaviour —
+   and the workspace was left unusable: `berth run` refused to enter it while
+   `berth done` kept failing. The error now names the control files to remove,
+   `docs/runtime.md` documents the recovery, and the harness performs it. A
+   workspace with 1.5 GB of `node_modules` still needs that manual step; making
+   the retry succeed on its own is worth a follow-up release.
+
+One intermittent issue was seen once and did not reproduce on the next run:
+
+- **`berth new` under four-way concurrency** failed on a Windows runner with
+  `git worktree add -b berth/epsilon ... exit status 128`. The acceptance test
+  exercises two workspaces in parallel and has never failed; the four-way
+  fan-out belongs to this harness, so it is recorded as an observation with the
+  exact error rather than as a confirmed defect. A repository-level lock around
+  worktree creation may be what keeps it from becoming one.
+
+Platform limitations that shape the numbers:
+
+- On Windows a native process cannot receive a quoted argument or one containing
+  a space, because the supervisor starts the command through `cmd /C` with the
+  quotes escaped as data. `docs/runtime.md` documents the three forms that work;
+  fixtures therefore read their configuration from the injected environment.
+- Container numbers come from Linux runners and native numbers from both Linux
+  runners and a Windows laptop, so cross-runtime comparisons should be read as
+  orders of magnitude, not as a controlled benchmark.
+
 ## Results
 
 The raw reports are committed next to this file. See `report.md` for the

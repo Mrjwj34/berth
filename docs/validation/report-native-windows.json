@@ -1,0 +1,363 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-12T11:11:12Z",
+  "mode": "native",
+  "levels": {
+    "l1": {
+      "duration_ms": 34744.5,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "workspace reports itself ready",
+          "ok": true,
+          "detail": "ports={'pc': 20001, 'web': 20000}"
+        },
+        {
+          "name": "no tracked file is dirty right after creation",
+          "ok": true,
+          "detail": "dirty=False"
+        },
+        {
+          "name": "health reports the workspace slug",
+          "ok": true,
+          "detail": "got 'alpha', want 'alpha'"
+        },
+        {
+          "name": "create returns three stored items",
+          "ok": true,
+          "detail": "got 3, want 3"
+        },
+        {
+          "name": "listing returns the exact three payloads",
+          "ok": true,
+          "detail": "got [('a1', 'widget', 3), ('a2', 'gadget', 5), ('a3', 'sprocket', 7)], want [('a1', 'widget', 3), ('a2', 'gadget', 5), ('a3', 'sprocket', 7)]"
+        },
+        {
+          "name": "single read round-trips the stored value",
+          "ok": true,
+          "detail": "got ('gadget', 5), want ('gadget', 5)"
+        },
+        {
+          "name": "update is visible through the aggregate endpoint",
+          "ok": true,
+          "detail": "got (3, ['gadget', 'sprocket', 'widget']), want (3, ['gadget', 'sprocket', 'widget'])"
+        },
+        {
+          "name": "delete removes exactly one item",
+          "ok": true,
+          "detail": "got 2, want 2"
+        },
+        {
+          "name": "deleted item is gone",
+          "ok": true,
+          "detail": "got 404, want 404"
+        },
+        {
+          "name": "down releases the published port",
+          "ok": true,
+          "detail": "port 20000 still open"
+        },
+        {
+          "name": "up makes the service reachable again",
+          "ok": true,
+          "detail": "service did not come back"
+        },
+        {
+          "name": "private data survives down/up",
+          "ok": true,
+          "detail": "got 2, want 2"
+        },
+        {
+          "name": "reset makes the service reachable again",
+          "ok": true,
+          "detail": "service did not come back after reset"
+        },
+        {
+          "name": "reset wipes private data",
+          "ok": true,
+          "detail": "got 0, want 0"
+        },
+        {
+          "name": "four parallel workspaces get four distinct ports",
+          "ok": true,
+          "detail": "got 4, want 4"
+        },
+        {
+          "name": "each parallel workspace sees only its own data",
+          "ok": true,
+          "detail": "got [['beta'], ['gamma'], ['delta'], ['epsilon']], want [['beta'], ['gamma'], ['delta'], ['epsilon']]"
+        },
+        {
+          "name": "the first workspace is unaffected by the others",
+          "ok": true,
+          "detail": "got 0, want 0"
+        },
+        {
+          "name": "berth run preserves argv characters verbatim",
+          "ok": true,
+          "detail": "got \"spaces 'quotes' $HOME & pipes|\", want \"spaces 'quotes' $HOME & pipes|\""
+        },
+        {
+          "name": "copy_dirs materialises the dependency tree",
+          "ok": true,
+          "detail": "missing <home>\\appdata\\local\\temp\\berth-validation-313dw9v0\\l1-project-111112.berths\\cow\\deps\\blob-0.bin"
+        },
+        {
+          "name": "writing into a copied tree does not change the source",
+          "ok": true,
+          "detail": "source tree was modified"
+        }
+      ],
+      "timings_ms": {
+        "new_and_up_ms": 3256.910200000042,
+        "status_ms": 1183.26,
+        "ports_ms": 1199.63,
+        "plan_ms": 126.16,
+        "ls_ms": 1191.08,
+        "down_ms": 1273.07,
+        "up_again_ms": 1748.68,
+        "reset_ms": 1528.6,
+        "parallel4_new_and_up_wall_ms": 4488.5,
+        "run_plain_ms": 19.04,
+        "run_via_berth_ms": 142.75,
+        "cow_48mb_new_ms": 883.19,
+        "cow_writeback_ms": 0.36
+      },
+      "resources": {
+        "supervised_processes": 1,
+        "supervised_rss_kb": 4596,
+        "workspace_disk_kb": 32,
+        "data_dir_kb": 0,
+        "container_mem_bytes": null,
+        "container_start_ms": null,
+        "cow_tree_kb": 48129
+      },
+      "notes": []
+    },
+    "l2": {
+      "duration_ms": 17729.4,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "the two declared ports differ",
+          "ok": true,
+          "detail": "20001 == 20000"
+        },
+        {
+          "name": "frontend reports the backend aggregate",
+          "ok": true,
+          "detail": "got (3, ['one', 'three', 'two']), want (3, ['one', 'three', 'two'])"
+        },
+        {
+          "name": "frontend page renders backend state",
+          "ok": true,
+          "detail": "<html><body data-slug='alpha'>count=3 names=one,three,two</body></html>"
+        },
+        {
+          "name": "services return after reset",
+          "ok": true,
+          "detail": "frontend never reported an empty backend"
+        },
+        {
+          "name": "frontend follows the backend after its data is wiped",
+          "ok": true,
+          "detail": "got 0, want 0"
+        },
+        {
+          "name": "second workspace renders its own backend",
+          "ok": true,
+          "detail": "<html><body data-slug='beta'>count=1 names=beta-only</body></html>"
+        },
+        {
+          "name": "first workspace is unaffected",
+          "ok": true,
+          "detail": "<html><body data-slug='alpha'>count=0 names=</body></html>"
+        }
+      ],
+      "timings_ms": {
+        "new_and_up_ms": 3401.1151000000536,
+        "reset_ms": 2074.48
+      },
+      "resources": {
+        "supervised_processes": 2,
+        "supervised_rss_kb": 9196,
+        "workspace_disk_kb": 50,
+        "container_mem_bytes": null,
+        "container_start_ms": null
+      },
+      "notes": []
+    },
+    "l3": {
+      "duration_ms": 19894.95,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "api and db ports differ",
+          "ok": true,
+          "detail": "20001 == 20000"
+        },
+        {
+          "name": "setup hook created the schema in the database service",
+          "ok": true,
+          "detail": "tables=['orders', 'sqlite_sequence']"
+        },
+        {
+          "name": "order boltx10 accepted",
+          "ok": true,
+          "detail": "got 201, want 201"
+        },
+        {
+          "name": "order nutx20 accepted",
+          "ok": true,
+          "detail": "got 201, want 201"
+        },
+        {
+          "name": "order boltx5 accepted",
+          "ok": true,
+          "detail": "got 201, want 201"
+        },
+        {
+          "name": "SQL aggregate sums units",
+          "ok": true,
+          "detail": "got 36, want 36"
+        },
+        {
+          "name": "SQL aggregate counts rows",
+          "ok": true,
+          "detail": "got 4, want 4"
+        },
+        {
+          "name": "SQL group-by per sku",
+          "ok": true,
+          "detail": "got {'bolt': 15, 'nut': 20, 'seed': 1}, want {'bolt': 15, 'nut': 20, 'seed': 1}"
+        },
+        {
+          "name": "order listing is ordered and complete",
+          "ok": true,
+          "detail": "got [('seed', 1), ('bolt', 10), ('nut', 20), ('bolt', 5)], want [('seed', 1), ('bolt', 10), ('nut', 20), ('bolt', 5)]"
+        },
+        {
+          "name": "database contents survive down/up",
+          "ok": true,
+          "detail": "orders were not preserved across a restart"
+        },
+        {
+          "name": "reset restores the seeded schema",
+          "ok": true,
+          "detail": "reset did not return the database to its seeded state"
+        },
+        {
+          "name": "second workspace has its own database",
+          "ok": true,
+          "detail": "got (100, 2), want (100, 2)"
+        },
+        {
+          "name": "first workspace database is untouched",
+          "ok": true,
+          "detail": "got (1, 1), want (1, 1)"
+        },
+        {
+          "name": "each workspace has its own database file",
+          "ok": true,
+          "detail": "sqlite file missing in one workspace"
+        }
+      ],
+      "timings_ms": {
+        "new_migrate_up_ms": 3383.0799000000698,
+        "reset_ms": 1761.32
+      },
+      "resources": {
+        "supervised_processes": 2,
+        "supervised_rss_kb": 9220,
+        "workspace_disk_kb": 94,
+        "database_kb": 44,
+        "container_mem_bytes": null,
+        "container_start_ms": null
+      },
+      "notes": []
+    },
+    "l4": {
+      "duration_ms": 25985.39,
+      "ok": true,
+      "error": null,
+      "checks": [
+        {
+          "name": "external project gin cloned",
+          "ok": true,
+          "detail": "https://github.com/gin-gonic/gin -> <home>\\AppData\\Local\\Temp\\berth-validation-313dw9v0\\l4-gin-111112"
+        },
+        {
+          "name": "every workspace checkout contains the project",
+          "ok": true,
+          "detail": "['<home>\\\\appdata\\\\local\\\\temp\\\\berth-validation-313dw9v0\\\\l4-gin-111112.berths\\\\real1', '<home>\\\\appdata\\\\local\\\\temp\\\\berth-validation-313dw9v0\\\\l4-gin-111112.berths\\\\real2']"
+        },
+        {
+          "name": "go build ./... succeeds inside the workspace",
+          "ok": true,
+          "detail": "go: downloading golang.org/x/text v0.39.0\ngo: downloading github.com/quic-go/qpack v0.6.0\ngo: downloading github.com/go-playground/locales v0.14.1\ngo: downloading golang.org/x/sys v0.46.0"
+        },
+        {
+          "name": "go test ./... is not applicable on windows (informational)",
+          "ok": true,
+          "detail": "gin's TestSaveUploadedFileWithPermission, TestSaveUploadedFileWithPermissionFailed and TestSaveUploadedFileToExistingDir assert POSIX permission errors, which Windows does not enforce; the same command is strict on Linux"
+        },
+        {
+          "name": "the same business command succeeds in all 2 workspaces",
+          "ok": true,
+          "detail": "got [0, 0], want [0, 0]"
+        },
+        {
+          "name": "every workspace is released after the business commands",
+          "ok": true,
+          "detail": "still registered: []"
+        }
+      ],
+      "timings_ms": {
+        "clone_ms": 616.86,
+        "new_real1_ms": 443.07,
+        "new_real2_ms": 444.8,
+        "run_go build ./..._ms": 21286.41,
+        "parallel_all_workspaces_first_check_ms": 1686.44
+      },
+      "resources": {
+        "workspace_disk_mb": 0,
+        "project_disk_mb": 1,
+        "container_mem_bytes": null,
+        "supervised_processes": 0,
+        "supervised_rss_kb": 0
+      },
+      "notes": [
+        "spec: tests/validation/l4-public.json",
+        "go build ./...: exit 0 in 21286.41 ms | full output: <home>\\AppData\\Local\\Temp\\berth-validation-313dw9v0\\logs\\gin-go-build.log | tail: go: downloading github.com/quic-go/qpack v0.6.0 | go: downloading github.com/go-playground/locales v0.14.1 | go: downloading golang.org/x/sys v0.46.0",
+        "SKIPPED on windows: go test ./... \u2014 gin's TestSaveUploadedFileWithPermission, TestSaveUploadedFileWithPermissionFailed and TestSaveUploadedFileToExistingDir assert POSIX permission errors, which Windows does not enforce; the same command is strict on Linux"
+      ]
+    }
+  },
+  "environment": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "python": "3.12.10",
+    "cpu_count": 4,
+    "berth": "D:\\a\\berth\\berth\\berth.exe",
+    "image": null,
+    "engine": "docker",
+    "temp_root": "<home>\\AppData\\Local\\Temp\\berth-validation-313dw9v0",
+    "doctor": {
+      "ok": true,
+      "checks": [
+        {
+          "name": "git",
+          "ok": true,
+          "detail": "git version 2.55.0.windows.5"
+        },
+        {
+          "name": "state",
+          "ok": true,
+          "detail": "<home>\\AppData\\Local\\Temp\\berth-validation-313dw9v0\\berth-home\\state.json"
+        }
+      ]
+    }
+  }
+}
