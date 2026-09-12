@@ -115,6 +115,39 @@ Platform limitations that shape the numbers:
   runners and a Windows laptop, so cross-runtime comparisons should be read as
   orders of magnitude, not as a controlled benchmark.
 
+## How to read native against container numbers
+
+Both runtimes are measured with the same fixtures and the same assertions, but
+three things must be kept in mind before comparing them:
+
+- **The container numbers contain no virtualisation cost, because on Linux there
+  is none.** A container shares the host kernel through namespaces and cgroups;
+  the engine is not a virtual machine. The Docker Desktop VM that exists on macOS
+  and Windows — the cost the project's readme argues about — was never measured
+  here, because the machine that produced the native reports has no container
+  engine and the container reports come from Linux runners.
+- **The container columns also exclude the image.** The runtime image is 240 MB,
+  and the Go runtime image 817 MB, built once per toolchain and shared by every
+  workspace; that cost is real but amortised, so it appears in the container job's
+  facts rather than in a per-workspace timing.
+- **Native numbers from Windows are roughly twice the Linux ones** for the same
+  fixture (see `new_and_up_ms`), so the operating system and process start-up
+  dominate the runtime choice.
+
+In this data native Linux is faster on nearly every metric, including creation
+(1.67 s against 1.99 s), restart, reset, four-way parallel creation and the
+overhead of `berth run` (29 ms against 148 ms). The container runtime's only
+advantage is three read-only commands (`status`, `ports`, `ls`, about 200 ms
+against 310 ms), which is one IPC round trip to the same supervisor client and is
+not a meaningful difference between runtimes.
+
+## Which revision these reports describe
+
+The reports in this directory were produced by the \alidation\ workflow at
+commit \$sha\, which includes the container spec-hash fix they helped find, and by
+local runs of the same commit. A later change to the product should regenerate
+them with \	ests/validation/collect.py\ rather than editing numbers by hand.
+
 ## Results
 
 The raw reports are committed next to this file. See `report.md` for the

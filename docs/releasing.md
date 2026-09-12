@@ -72,6 +72,20 @@ downloaded files. Only then continue.
 
 ## 5. Publish to the tap and the bucket
 
+**This step is automated.** Both repositories run `.github/workflows/update.yml`,
+which reads the latest release's `checksums.txt`, renders their manifest again and
+commits only when the published hashes differ. They run daily and on demand:
+
+```sh
+gh workflow run update --repo Mrjwj34/homebrew-tap
+gh workflow run update --repo Mrjwj34/scoop-bucket
+```
+
+Nothing needs to happen after a release; the recipes below are for the case where
+the automation is broken and a manifest has to be corrected by hand.
+
+### Manual fallback
+
 Both repositories are written through the contents API so no clone is needed.
 Get the current blob sha first, then send the new file:
 
@@ -94,6 +108,18 @@ platform.
 
 ## 6. winget
 
+**This step is manual**: one pull request per version. `wingetcreate update
+Mrjwj34.berth --version <version> --urls <url> --submit` does it in one command
+when run by the account that owns the package, and the API calls in this runbook's
+history do the same thing by hand. The first submission additionally needs a
+signed Contributor License Agreement; later versions do not.
+
+Superseded submissions are closed rather than left queued: a version that was
+never merged and has been replaced by a newer release should not stay open
+(`Mrjwj34.berth` 0.2.0 was closed when 0.3.0 was submitted).
+
+### Manual fallback
+
 The package exists as `Mrjwj34.berth` in `microsoft/winget-pkgs`. Bump the three
 manifests under `manifests/m/Mrjwj34/berth/<version>/` in a fork, with the pull
 request titled `New version/Update: Mrjwj34.berth version <version>`.
@@ -105,7 +131,7 @@ review pipeline would:
 winget validate --manifest distribution/winget
 ```
 
-The first submission needs a signed Contributor License Agreement; later version
+The manual route described below needs a signed Contributor License Agreement; later version
 bumps do not.
 
 ## 7. After publishing
