@@ -323,8 +323,8 @@ class Harness:
             self.container_note(f"docker stats {name}: {(out.stderr or out.stdout).strip()[:160]}")
         except Exception as error:
             self.container_note(f"docker stats {name}: {error}")
-        for candidate in (pathlib.Path(f"/sys/fs/cgroup/system.slice/docker-{identity}.scope/memory.current"),
-                          pathlib.Path(f"/sys/fs/cgroup/docker/{identity}/memory.current")):
+        for candidate in (Path(f"/sys/fs/cgroup/system.slice/docker-{identity}.scope/memory.current"),
+                          Path(f"/sys/fs/cgroup/docker/{identity}/memory.current")):
             try:
                 if candidate.exists():
                     return int(candidate.read_text().strip())
