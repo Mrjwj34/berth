@@ -177,6 +177,8 @@ No. berth relies on file locks and a single machine-level registry file. Long op
 
 Yes. Native binaries are published for Linux, macOS and Windows on both amd64 and arm64. Container mode requires an existing local Docker or Podman installation. Writable dependency copies use Copy on Write where the filesystem supports it — reflink on Linux btrfs and xfs, clonefile on APFS — and never silently fall back to hardlinks.
 
+One Windows caveat: the supervisor starts a native process by splitting its command string on whitespace and does not strip quotes, so a quoted argument arrives with the quotes in it and an argument containing a space arrives split. Pass paths relative to the workspace root, or read `BERTH_DATA_DIR` from inside your program; berth warns on `up` when a command cannot work that way. Container workspaces are unaffected.
+
 ## Architecture
 
 berth separates workspace management from the execution context. Each workspace has its own branch configuration, runtime plan, and operation lock.

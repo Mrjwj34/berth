@@ -98,3 +98,35 @@ Git metadata is writable, user hooks are code, and explicitly supplied config ma
 contain side effects. An untrusted-agent sandbox needs separate credentials,
 filesystem policy, egress policy and resource enforcement. Do not describe this
 runner as a complete security sandbox.
+
+## Windows
+
+A native process on Windows is started by process-compose, which splits the
+`command` string on whitespace and passes the pieces as argv without honoring
+quotes. Measured against process-compose 1.122.0, the command
+`python app.py --db "$BERTH_DATA_DIR/x.db"` reaches the program as
+`["--db", '"C:\...\project', "with", 'spaces\.berth\data/x.db"']`: the quote
+characters are part of the value and the path is split in two. Three forms work,
+in order of preference:
+
+1. Paths relative to the workspace root, which berth already sets as
+   `working_dir`: `--db .berth/data/x.db`.
+2. Values read from the environment inside the program (`BERTH_DATA_DIR`,
+   `BERTH_PORT_*`). The environment is passed as a block and is never split.
+3. A checkout whose path contains no spaces, when an absolute path cannot be
+   avoided.
+
+berth warns on `up` when a declared command cannot work this way, naming the
+process and the fix. Container workspaces are unaffected, because their commands
+run inside Linux. The supervisor itself also needs `BERTH_HOME` on a path without
+spaces on Windows.
+
+### When the supervisor state is unknown
+
+If the control files exist but the supervisor does not answer, berth treats the
+process state as unknown and refuses every operation that could destroy data,
+including `done --force`. That is deliberate: the alternative is removing a
+checkout while processes still hold it. The error names the log to inspect. When
+no `process-compose` is running for that workspace, remove the stale control
+files (`pc.port`, and the `pc.sock`/`*.token` pair beside it) under the berth
+directory of the workspace, then retry `down` and `done`.

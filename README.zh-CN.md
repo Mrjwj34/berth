@@ -177,6 +177,8 @@ npx skills add Mrjwj34/berth
 
 支持。官方为 Linux、macOS、Windows 的 amd64 与 arm64 都发布原生二进制。容器模式需要本机已安装 Docker 或 Podman。可写依赖的复制在支持的文件系统上使用写时复制——Linux btrfs/xfs 用 reflink，APFS 用 clonefile——并且永远不会静默退化成硬链接。
 
+Windows 有一个平台限制：监督进程启动原生服务时会按空格切分命令字符串，且不剥离引号，因此带引号的参数会连同引号一起传入，含空格的参数会被切成两段。请使用相对工作区根目录的路径，或在程序内部读取 `BERTH_DATA_DIR`；berth 在 `up` 时检测到这类命令会给出警告。容器工作区不受影响。
+
 ## 架构
 
 berth 将工作区生命周期管理与底层执行环境解耦。每个工作区独立维护分支配置、执行计划与操作锁。

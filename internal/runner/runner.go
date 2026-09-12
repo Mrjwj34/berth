@@ -114,6 +114,7 @@ func (s *Session) Up(ctx context.Context) error {
 		return err
 	}
 	if s.Workspace.Runtime.Kind() == "native" {
+		warnNativeWindowsCommands(s)
 		return process.Up(ctx, s.Workspace.Path, s.Env(), s.Workspace.Ports["pc"])
 	}
 	pc, err := s.pcRunning(ctx)
@@ -130,6 +131,27 @@ func (s *Session) Up(ctx context.Context) error {
 	defer cancel()
 	return process.WaitReady(child, s.Status)
 }
+
+// warnNativeWindowsCommands explains a platform limitation before it turns into
+// a confusing runtime failure. process-compose starts a native process by
+// splitting the command string on Windows instead of running it through a
+// shell, so quotes stay part of the argument and a value containing a space
+// arrives split in two — the program then reports an error about half a path.
+// The warning goes to stderr because the CLI keeps stdout machine-readable.
+func warnNativeWindowsCommands(s *Session) {
+	if runtime.GOOS != "windows" || s.Config == nil {
+		return
+	}
+	problems := process.WindowsCommandProblems(s.Config.Processes, s.Env())
+	if len(problems) == 0 {
+		return
+	}
+	for _, problem := range problems {
+		fmt.Fprintln(os.Stderr, "berth: warning: "+problem)
+	}
+	fmt.Fprintln(os.Stderr, "berth: warning: "+process.WindowsCommandRemedy)
+}
+
 func (s *Session) Running(ctx context.Context) (bool, error) {
 	if s.Workspace.Runtime.Kind() == "native" {
 		return process.IsRunning(ctx, s.Workspace.Path)
