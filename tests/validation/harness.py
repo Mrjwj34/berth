@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+from datetime import datetime
 import json
 import os
 import platform
@@ -282,21 +283,72 @@ class Harness:
         procs = payload.get("processes") or []
         return [int(p["pid"]) for p in procs if p.get("pid")], len(procs)
 
-    def container_mem_bytes(self, path: str) -> int | None:
-        if self.mode != "container":
-            return None
+    def container_identity(self, path: str) -> str | None:
         try:
             state = json.loads((self.home / "state.json").read_text())
-            identity = state["workspaces"][path]["id"]
-        except Exception:
+            return state["workspaces"][path]["id"]
+        except Exception as error:
+            self.container_note(f"state lookup failed: {error}")
             return None
-        out = subprocess.run([self.args.engine, "stats", "--no-stream", "--format", "{{.MemUsage}}",
-                              f"berth-{identity}"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
+
+    def container_note(self, text: str) -> None:
+        notes = self.report["environment"].get("container_notes", [])
+        if text not in notes:
+            notes.append(text)
+            self.report["environment"]["container_notes"] = notes
+
+    def container_mem_bytes(self, path: str) -> int | None:
+        """Whole-container memory.
+
+        The native RSS sample reads host PIDs, and a workspace whose processes
+        live inside a container has none, so this is the only comparable memory
+        number in container mode. When neither the engine nor the cgroup answers,
+        the reason is recorded instead of leaving a silent gap.
+        """
+        if self.mode != "container":
+            return None
+        identity = self.container_identity(path)
+        if identity is None:
+            return None
+        name = f"berth-{identity}"
+        scale = {"B": 1, "kB": 1000, "KiB": 1024, "MB": 1000 ** 2, "MiB": 1024 ** 2,
+                 "GB": 1000 ** 3, "GiB": 1024 ** 3}
         try:
-            value, unit = out.split("/")[0].strip().split(" ")
-            scale = {"B": 1, "KiB": 1024, "MiB": 1024 ** 2, "GiB": 1024 ** 3}[unit]
-            return int(float(value) * scale)
-        except Exception:
+            out = subprocess.run([self.args.engine, "stats", "--no-stream", "--format", "{{.MemUsage}}", name],
+                                 capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", timeout=90)
+            if out.returncode == 0 and "/" in out.stdout:
+                value, unit = out.stdout.split("/")[0].strip().split(" ")
+                return int(float(value) * scale[unit.strip()])
+            self.container_note(f"docker stats {name}: {(out.stderr or out.stdout).strip()[:160]}")
+        except Exception as error:
+            self.container_note(f"docker stats {name}: {error}")
+        for candidate in (pathlib.Path(f"/sys/fs/cgroup/system.slice/docker-{identity}.scope/memory.current"),
+                          pathlib.Path(f"/sys/fs/cgroup/docker/{identity}/memory.current")):
+            try:
+                if candidate.exists():
+                    return int(candidate.read_text().strip())
+            except OSError:
+                continue
+        return None
+
+    def container_start_ms(self, path: str) -> float | None:
+        """Latency between the container being created and it being running."""
+        if self.mode != "container":
+            return None
+        identity = self.container_identity(path)
+        if identity is None:
+            return None
+        try:
+            out = subprocess.run([self.args.engine, "inspect", "--format",
+                                  "{{.Created}}|{{.State.StartedAt}}", f"berth-{identity}"],
+                                 capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", timeout=60)
+            created, started = out.stdout.strip().split("|")
+            parse = lambda text: datetime.fromisoformat(text.replace("Z", "+00:00"))
+            return round((parse(started) - parse(created)).total_seconds() * 1000, 2)
+        except Exception as error:
+            self.container_note(f"container start latency: {error}")
             return None
 
     def run_timing(self, level: str, label: str, fn) -> dict:
@@ -426,12 +478,14 @@ class Harness:
         checks.equal("berth run preserves argv characters verbatim", out.stdout.strip(), literal)
 
         pids, count = self.supervised(alpha["slug"], repo)
+        memory, start = self.container_mem_bytes(alpha["path"]), self.container_start_ms(alpha["path"])
         resources = {
             "supervised_processes": count,
             "supervised_rss_kb": rss_kb(pids),
             "workspace_disk_kb": dir_kb(Path(alpha["path"])),
             "data_dir_kb": dir_kb(Path(alpha["path"]) / ".berth" / "data"),
-            "container_mem_bytes": self.container_mem_bytes(alpha["path"]),
+            "container_mem_bytes": memory,
+            "container_start_ms": start,
         }
 
         # Copy-on-write behaviour for declared dependency trees
@@ -500,11 +554,13 @@ class Harness:
         checks.that("first workspace is unaffected", "count=0" in alpha_page, alpha_page[:200])
 
         pids, count = self.supervised("alpha", repo)
+        memory, start = self.container_mem_bytes(alpha["path"]), self.container_start_ms(alpha["path"])
         resources = {
             "supervised_processes": count,
             "supervised_rss_kb": rss_kb(pids),
             "workspace_disk_kb": dir_kb(Path(alpha["path"])),
-            "container_mem_bytes": self.container_mem_bytes(alpha["path"]),
+            "container_mem_bytes": memory,
+            "container_start_ms": start,
         }
         for workspace in (alpha, second):
             self.cli("done", workspace["slug"], "--force", cwd=repo, timeout=180)
@@ -563,12 +619,14 @@ class Harness:
                     "sqlite file missing in one workspace")
 
         pids, count = self.supervised("alpha", repo)
+        memory, start = self.container_mem_bytes(alpha["path"]), self.container_start_ms(alpha["path"])
         resources = {
             "supervised_processes": count,
             "supervised_rss_kb": rss_kb(pids),
             "workspace_disk_kb": dir_kb(Path(alpha["path"])),
             "database_kb": dir_kb(Path(alpha["path"]) / ".berth" / "data"),
-            "container_mem_bytes": self.container_mem_bytes(alpha["path"]),
+            "container_mem_bytes": memory,
+            "container_start_ms": start,
         }
         for workspace in (alpha, second):
             self.cli("done", workspace["slug"], "--force", cwd=repo, timeout=180)
