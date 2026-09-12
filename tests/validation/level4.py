@@ -151,7 +151,7 @@ def run_level4(harness, checks) -> dict:
                         True, f"exit {result.returncode} in {elapsed} ms")
         else:
             checks.that(f"{check['name']} succeeds inside the workspace",
-                        result.returncode == 0, "\n".join(tail) or f"exit {result.returncode}")
+                        result.returncode == 0, "\n".join(lines[-4:]) or f"exit {result.returncode}")
 
     # Parallel workspaces must each do real work without interfering.
     if len(created) > 1 and spec["checks"]:
