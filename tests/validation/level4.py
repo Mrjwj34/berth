@@ -31,6 +31,7 @@ than pretending to have passed.
 from __future__ import annotations
 
 import json
+import platform
 import os
 import shutil
 import subprocess

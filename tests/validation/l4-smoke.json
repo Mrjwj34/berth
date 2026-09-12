@@ -1,0 +1,12 @@
+{
+  "name": "smoke",
+  "repo": "https://github.com/octocat/Hello-World",
+  "base": "master",
+  "setup": [],
+  "checks": [
+    {"name": "workspace runs a real command", "cmd": ["git", "rev-parse", "HEAD"]},
+    {"name": "platform-specific check", "cmd": ["git", "status", "--porcelain"],
+     "skip_on": {"windows": "smoke spec: exercises the skip_on path on Windows"}}
+  ],
+  "parallel_workspaces": 2
+}
