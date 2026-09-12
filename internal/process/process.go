@@ -361,7 +361,7 @@ func IsRunning(ctx context.Context, worktree string) (bool, error) {
 		return false, err
 	}
 	if _, err := queryStatus(ctx, worktree); err != nil {
-		return false, fmt.Errorf("process state unknown: %s exists but the supervisor does not answer (inspect %s). Nothing destructive runs while the state is unknown; if no process-compose is running for this workspace, remove the stale control files in %s and retry: %w", endpoint, LogFile(worktree), config.BerthDir(worktree), err)
+		return false, fmt.Errorf("process state unknown: %s exists but the supervisor does not answer (inspect %s). Nothing destructive runs while the state is unknown; if no process-compose is running for this workspace, remove %s, %s and the socket beside them (on Windows they live under BERTH_HOME/run), then retry: %w", endpoint, LogFile(worktree), PortFile(worktree), TokenFile(worktree), err)
 	}
 	return true, nil
 }

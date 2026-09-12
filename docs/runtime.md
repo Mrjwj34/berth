@@ -101,20 +101,35 @@ runner as a complete security sandbox.
 
 ## Windows
 
-A native process on Windows is started by process-compose, which splits the
-`command` string on whitespace and passes the pieces as argv without honoring
-quotes. Measured against process-compose 1.122.0, the command
-`python app.py --db "$BERTH_DATA_DIR/x.db"` reaches the program as
-`["--db", '"C:\...\project', "with", 'spaces\.berth\data/x.db"']`: the quote
-characters are part of the value and the path is split in two. Three forms work,
-in order of preference:
+A native process on Windows cannot receive an argument that contains a space,
+and it cannot receive a quoted argument. The cause is in the chain, not in the
+configuration: process-compose starts the command as `["cmd", "/C", <the whole
+command string>]`, the Go runtime escapes the quote characters inside that
+string as `\"`, and `cmd.exe` treats a backslash as an ordinary character. The
+quote therefore arrives as data and the space behind it stops grouping words.
+Observed in `process-compose.log` for a command that quotes its data directory:
 
-1. Paths relative to the workspace root, which berth already sets as
-   `working_dir`: `--db .berth/data/x.db`.
-2. Values read from the environment inside the program (`BERTH_DATA_DIR`,
-   `BERTH_PORT_*`). The environment is passed as a block and is never split.
-3. A checkout whose path contains no spaces, when an absolute path cannot be
-   avoided.
+```
+INF Started command=["cmd","/C","go run ./cmd/server --db \"d:\\...\\smoke-a\\.berth\\data/rei.db\""]
+[server] exit status 1
+```
+
+Three fixes work, in order of preference:
+
+1. **Drop the quotes and keep every argument space-free.** Ports always qualify;
+   `--listen 127.0.0.1:${BERTH_PORT_SERVER}` is fine unquoted.
+2. **Give the workspace a space-free path** so absolute paths do too: set
+   `worktree_root` to a directory without spaces, for example
+   `worktree_root: C:/berth-workspaces`. `BERTH_DATA_DIR` is then space-free and
+   `--db ${BERTH_DATA_DIR}/rei.db` works unquoted. A relative path such as
+   `.berth/data/rei.db` works as well, because berth sets `working_dir` to the
+   workspace root.
+3. **Read the value from the environment inside the program.** The environment is
+   passed as a block and is never split, so `BERTH_DATA_DIR` keeps its spaces.
+
+Use `${BERTH_DATA_DIR}`, not `%BERTH_DATA_DIR%`: berth substitutes the
+`${...}` form itself, and the `%...%` form is expanded later by `cmd`, if at all.
+Quoting is still correct on Linux and macOS, where commands run through a shell.
 
 berth warns on `up` when a declared command cannot work this way, naming the
 process and the fix. Container workspaces are unaffected, because their commands
@@ -126,7 +141,11 @@ spaces on Windows.
 If the control files exist but the supervisor does not answer, berth treats the
 process state as unknown and refuses every operation that could destroy data,
 including `done --force`. That is deliberate: the alternative is removing a
-checkout while processes still hold it. The error names the log to inspect. When
-no `process-compose` is running for that workspace, remove the stale control
-files (`pc.port`, and the `pc.sock`/`*.token` pair beside it) under the berth
-directory of the workspace, then retry `down` and `done`.
+checkout while processes still hold it.
+
+The control files are not inside the workspace. On Windows they live under
+`BERTH_HOME/run/<hash>/` as `pc.port` and `pc.token`; on Unix the socket is
+`<workspace>/.berth/pc.sock` with a `pc.token` beside it. When no
+`process-compose` is running for that workspace, remove the stale pair, then
+retry `down` and `done`. `pc.yaml`, `data` and the checkout are untouched by that
+cleanup.

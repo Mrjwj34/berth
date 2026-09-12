@@ -81,4 +81,11 @@ func spacedValues(env map[string]string) []string {
 
 // WindowsCommandRemedy is the fix users apply to the problems above. It is kept
 // next to the detection so the message and the documentation cannot drift.
-const WindowsCommandRemedy = "Windows starts these commands through process-compose, which splits the command on spaces and does not strip quotes. Pass paths relative to the workspace root (berth sets working_dir there), read BERTH_DATA_DIR from the environment inside your program, or move the checkout to a path without spaces"
+//
+// The underlying cause is that process-compose starts the command as
+// ["cmd", "/C", <the whole string>], and the Go runtime escapes the quotes
+// inside that string as \" while cmd.exe treats a backslash as an ordinary
+// character. The quote therefore reaches the program as data and the space
+// behind it stops grouping words. Nothing berth writes can change that
+// escaping, so the fix is on the configuration side.
+const WindowsCommandRemedy = "Windows starts these commands as \"cmd /C <the whole string>\", where the Go runtime escapes quote characters that cmd.exe then treats as data. Drop the quotes and make every argument space-free: use a path relative to the workspace root, point worktree_root at a directory without spaces so BERTH_DATA_DIR has none either, or read BERTH_DATA_DIR from the environment inside your program"
