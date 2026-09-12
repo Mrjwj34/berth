@@ -105,6 +105,57 @@ jobs:
       - name: Build the Go runtime image for level 4
         run: docker build -t berth-runtime-golang:test --build-arg BASE_IMAGE=golang:1.25-bookworm -f runtime/Dockerfile .
 
+      - name: Diagnose the runtime contract for a project without processes
+        if: always()
+        run: |
+          set -euo pipefail
+          export BERTH_HOME="${RUNNER_TEMP}/berth-diag-home"
+          mkdir -p "$BERTH_HOME"
+          work="${RUNNER_TEMP}/diag-project"
+          mkdir -p "$work" && cd "$work"
+          git init -q -b main .
+          git config user.name diag
+          git config user.email diag@example.invalid
+          cat > berth.yaml <<'YAML'
+          version: 1
+          base: main
+          runtime:
+            backend: container
+            engine: docker
+            image: berth-runtime-golang:test
+          ports: []
+          processes: {}
+          YAML
+          git add . && git commit -qm diag
+          "$GITHUB_WORKSPACE/berth" new diag --json > /tmp/diag-new.json || true
+          workspace=$(python3 -c "import json;print(json.load(open('/tmp/diag-new.json'))['path'])")
+          identity=$(python3 -c "import json;print(json.load(open('$BERTH_HOME/state.json'))['workspaces']['$workspace']['id'])")
+          export BERTH_HOME
+          {
+            echo "## diagnostic: container workspace without processes"
+            echo
+            echo "workspace record:"
+            echo
+            echo '```json'
+            python3 -c "import json;print(json.dumps(json.load(open('$BERTH_HOME/state.json'))['workspaces']['$workspace'], indent=2, sort_keys=True))"
+            echo '```'
+            echo "container labels:"
+            echo
+            echo '```json'
+            docker inspect "berth-$identity" --format '{{json .Config.Labels}}' || true
+            echo '```'
+            echo "plan:"
+            echo
+            echo '```json'
+            "$GITHUB_WORKSPACE/berth" plan "$workspace" 2>&1 || true
+            echo '```'
+            echo "berth run:"
+            echo
+            echo '```'
+            "$GITHUB_WORKSPACE/berth" run -- echo hello 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          "$GITHUB_WORKSPACE/berth" done diag --force || true
       - name: Validate every level inside one container per workspace
         env:
           BERTH_HOME: ${{ runner.temp }}/berth-home
