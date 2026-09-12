@@ -37,9 +37,23 @@ func digest(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:])
 }
+
+// specHash identifies the runtime contract a container was created for. Empty
+// and absent maps must hash identically: the workspace record carries
+// omitempty, so a project that declares no ports is persisted without the field
+// and reads back as nil, while the record that created the container held an
+// empty map. The container then failed its own ownership check and berth refused
+// to control a runtime it had just created.
 func (s *Session) specHash() string {
 	w := s.Workspace
-	data, _ := json.Marshal([]any{w.Runtime, w.Ports, w.Listen, w.GitDir, w.Path})
+	ports, listen := w.Ports, w.Listen
+	if len(ports) == 0 {
+		ports = nil
+	}
+	if len(listen) == 0 {
+		listen = nil
+	}
+	data, _ := json.Marshal([]any{w.Runtime, ports, listen, w.GitDir, w.Path})
 	return digest(string(data))
 }
 func (s *Session) engineOutput(ctx context.Context, args ...string) ([]byte, error) {

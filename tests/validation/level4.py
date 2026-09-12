@@ -133,8 +133,19 @@ def run_level4(harness, checks) -> dict:
         result = harness.cli("run", "--", *check["cmd"], cwd=primary, timeout=harness.args.l4_timeout)
         elapsed = round(now_ms() - started, 2)
         timings[f"run_{check['name']}_ms"] = elapsed
-        tail = (result.stdout + result.stderr).strip().splitlines()[-4:]
-        notes.append(f"{check['name']}: exit {result.returncode} in {elapsed} ms | " + " | ".join(tail))
+        output = (result.stdout + result.stderr).strip()
+        lines = [line for line in output.splitlines() if line.strip()]
+        safe = "".join(c if c.isalnum() else "-" for c in check["name"]).strip("-")
+        log = harness.root / "logs" / f"{spec['name']}-{safe}.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(output, encoding="utf-8")
+        notes.append(f"{check['name']}: exit {result.returncode} in {elapsed} ms | "
+                     f"full output: {log} | tail: " + " | ".join(lines[-3:]))
+        if result.returncode != 0:
+            interesting = [line for line in lines
+                           if any(word in line for word in ("FAIL", "Error", "error:", "panic",
+                                                            "cannot", "expected", "✗"))][:10]
+            notes.append(f"{check['name']} failure lines: " + " | ".join(interesting or lines[:10]))
         if check.get("allow_failure"):
             checks.that(f"{check['name']} runs inside the workspace (informational)",
                         True, f"exit {result.returncode} in {elapsed} ms")
@@ -158,10 +169,15 @@ def run_level4(harness, checks) -> dict:
     resources["supervised_processes"] = count
     resources["supervised_rss_kb"] = rss_kb(pids)
 
-    released = []
+    released, release_errors = [], []
     for workspace in created:
         harness.release(repo, workspace["slug"])
-        released.append(not any(slug == workspace["slug"] for _, slug in harness.created))
+        done = not any(slug == workspace["slug"] for _, slug in harness.created)
+        released.append(done)
+        if not done:
+            failure = harness.cli("done", workspace["slug"], "--force", cwd=repo, timeout=180)
+            release_errors.append(f"{workspace['slug']}: "
+                                  f"{(failure.stdout + failure.stderr).strip()[:200]}")
     checks.that("every workspace is released after the business commands",
                 all(released), f"still registered: {[slug for _, slug in harness.created]}")
     if not all(released):
@@ -169,5 +185,6 @@ def run_level4(harness, checks) -> dict:
                      "checkout (a real dependency tree is large) and berth deliberately does "
                      "not fall back to a recursive delete, so the workspace stays pending "
                      "removal and berth run refuses to enter it.")
+        notes.append("release errors: " + " | ".join(release_errors))
         notes.append("cleanup: " + harness.cleanup_stuck_repo(repo))
     return {"checks": checks.rows, "timings_ms": timings, "resources": resources, "notes": notes}

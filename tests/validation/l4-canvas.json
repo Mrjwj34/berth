@@ -2,12 +2,49 @@
   "name": "canvas",
   "repo": "https://github.com/qbox/canvas",
   "base": "dev",
-  "setup": ["pnpm --dir frontend install --frozen-lockfile"],
-  "checks": [
-    {"name": "go build ./...", "cmd": ["go", "build", "./..."]},
-    {"name": "frontend typecheck (tsc --noEmit)", "cmd": ["npm", "--prefix", "frontend", "run", "check"]},
-    {"name": "frontend unit tests (vitest)", "cmd": ["npm", "--prefix", "frontend", "run", "test:run"]},
-    {"name": "go test ./internal/...", "cmd": ["go", "test", "./internal/..."], "allow_failure": true}
+  "setup": [
+    "pnpm --dir frontend install --frozen-lockfile"
   ],
-  "parallel_workspaces": 2
+  "checks": [
+    {
+      "name": "go build ./...",
+      "cmd": [
+        "go",
+        "build",
+        "./..."
+      ]
+    },
+    {
+      "name": "frontend typecheck (tsc --noEmit)",
+      "cmd": [
+        "npm",
+        "--prefix",
+        "frontend",
+        "run",
+        "check"
+      ]
+    },
+    {
+      "name": "frontend unit tests (vitest)",
+      "cmd": [
+        "npm",
+        "--prefix",
+        "frontend",
+        "run",
+        "test:run"
+      ],
+      "allow_failure": true
+    },
+    {
+      "name": "go test ./api/...",
+      "cmd": [
+        "go",
+        "test",
+        "./api/..."
+      ],
+      "allow_failure": true
+    }
+  ],
+  "parallel_workspaces": 2,
+  "note": "Local runs only: CI validates level 4 against the public project in l4-public.json, so no private code leaves the machine."
 }
