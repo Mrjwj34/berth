@@ -187,8 +187,10 @@ checkout stops and unregisters its runtime while preserving checkout, data and
 branch even with `--force`. `down` preserves data; `reset` wipes it deliberately
 and only after a verified shutdown. A workspace whose `runtime`/port contract
 changed still refuses in-place `up`, but `berth done` and `berth gc` reclaim it.
-Automatic GC never forces, and an unknown process or engine state means preserve
-the data and inspect the logs.
+A supervisor that exits on its own does not wedge a workspace: berth reclaims its
+stale control files once the recorded endpoint stops answering and no supervisor
+process is alive. Automatic GC never forces, and an unknown process or engine
+state means preserve the data and inspect the logs.
 
 Read `references/recovery.md` when a berth command fails: error → meaning →
 action, plus what `berth gc` collects and when it refuses.

@@ -217,13 +217,24 @@ func Up(ctx context.Context, worktree string, env map[string]string, pcPort int)
 			_ = log.Close()
 			return err
 		}
+		// The recorded PID covers the window before the supervisor answers: a
+		// concurrent status must not mistake a starting supervisor for a dead one.
+		if err := writePCPID(worktree, cmd.Process.Pid); err != nil {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+			_ = log.Close()
+			return err
+		}
 		if err := os.WriteFile(PortFile(worktree), []byte(strconv.Itoa(pcPort)), 0o600); err != nil {
+			_ = os.Remove(PIDFile(worktree))
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
 			_ = log.Close()
 			return err
 		}
 		go func() { _ = cmd.Wait(); _ = log.Close() }()
+		// From the first answer on, the control endpoint is the witness.
+		defer func() { _ = os.Remove(PIDFile(worktree)) }()
 		return waitReady(ctx, worktree, 60*time.Second)
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
@@ -292,6 +303,9 @@ func Down(ctx context.Context, worktree string) error {
 		return err
 	}
 	if err := os.Remove(PortFile(worktree)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Remove(PIDFile(worktree)); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
@@ -388,7 +402,10 @@ func Logs(ctx context.Context, worktree, name string, stdout, stderr io.Writer) 
 }
 
 // IsRunning distinguishes absence from an unresponsive supervisor. Destructive
-// operations must preserve data when process state cannot be established.
+// operations must preserve data when process state cannot be established. A
+// supervisor that exited on its own is not such a state: once it is provably
+// gone, its stale control files are reclaimed and the workspace counts as
+// stopped, because only a conversation with the supervisor ever removed them.
 func IsRunning(ctx context.Context, worktree string) (bool, error) {
 	endpoint := Socket(worktree)
 	if runtime.GOOS == "windows" {
@@ -400,7 +417,14 @@ func IsRunning(ctx context.Context, worktree string) (bool, error) {
 		return false, err
 	}
 	if _, err := queryStatus(ctx, worktree); err != nil {
-		return false, fmt.Errorf("process state unknown: %s exists but the supervisor does not answer (inspect %s). Nothing destructive runs while the state is unknown; if no process-compose is running for this workspace, remove %s, %s and the socket beside them (on Windows they live under BERTH_HOME/run), then retry: %w", endpoint, LogFile(worktree), PortFile(worktree), TokenFile(worktree), err)
+		if !supervisorGone(ctx, worktree) {
+			return false, fmt.Errorf("process state unknown: %s exists but the supervisor does not answer (inspect %s). Nothing destructive runs while the state is unknown; if no process-compose is running for this workspace, remove %s, %s and the socket beside them (on Windows they live under BERTH_HOME/run), then retry: %w", endpoint, LogFile(worktree), PortFile(worktree), TokenFile(worktree), err)
+		}
+		if rerr := reapStaleSupervisor(worktree); rerr != nil {
+			return false, fmt.Errorf("supervisor exited but its control files at %s could not be reclaimed: %w", endpoint, rerr)
+		}
+		warnReclaimedSupervisor(worktree, endpoint)
+		return false, nil
 	}
 	return true, nil
 }

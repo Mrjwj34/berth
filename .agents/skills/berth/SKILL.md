@@ -71,7 +71,7 @@ independent copy otherwise.
 | `berth status [<slug>] [--json]` | Processes, readiness and ports of a workspace |
 | `berth ports [<slug>] [--json]` | Allocated host ports and container listen mappings |
 | `berth plan [<slug>]` | Print the execution contract as JSON without starting anything |
-| `berth up [<slug>]` / `berth down [<slug>]` | Start / stop workspace processes, preserving data |
+| `berth up [<slug>] [--json]` / `berth down [<slug>]` | Start / stop workspace processes, preserving data; `up` prints ports and readiness |
 | `berth logs <proc> [<slug>]` | Logs of one managed process |
 | `berth run [--] <cmd> [args...]` | Run one command inside the workspace runtime and environment |
 | `berth attach [<slug>] [--json]` | Print path, branch and shell exports for the workspace |
@@ -84,7 +84,9 @@ independent copy otherwise.
 ### Where a workspace is
 
 - Path: `<repo>.berths/<slug>` beside the repository by default, or
-  `<worktree_root>/<slug>` when `worktree_root` is set. Branch: `berth/<slug>`.
+  `<worktree_root>/<slug>` when `worktree_root` is set. Branch: `berth/<slug>` by
+  default. The branch is not identity: a workspace stays usable after
+  `git checkout -B fix/<name>` or `hotfix/<name>`, and `BERTH_BRANCH` follows HEAD.
 - Slug rules: lowercase ASCII letters, digits, `-` and `_` only, no slashes.
 - The primary checkout is never a workspace (`berth adopt` refuses it). `berth run`
   and `berth open` accept no slug, so they resolve the workspace from the current
@@ -176,14 +178,19 @@ repository-side setup hook, so those worktrees are always registered by hand.
 
 ## Cleanup and recovery
 
-`berth done` requires preserved commits (merged or present upstream) and a clean
-worktree for berth-owned checkouts. `--force` cannot bypass ownership, identity,
-primary-worktree or shutdown checks. `adopt` is only for linked worktrees, and
-`berth done` on an adopted checkout stops and unregisters its runtime while
-preserving checkout, data and branch even with `--force`. `down` preserves data;
-`reset` wipes it deliberately and only after a verified shutdown. Automatic GC
-never forces, and an unknown process or engine state means preserve the data and
-inspect the logs.
+`berth done` requires preserved commits (merged, patch-equivalent in the base, or
+present upstream) and a clean worktree for berth-owned checkouts. A squash merge
+whose resulting tree matches the base counts as preserved; otherwise `--force`.
+`--force` cannot bypass ownership, worktree identity, primary-worktree or shutdown
+checks. `adopt` is only for linked worktrees, and `berth done` on an adopted
+checkout stops and unregisters its runtime while preserving checkout, data and
+branch even with `--force`. `down` preserves data; `reset` wipes it deliberately
+and only after a verified shutdown. A workspace whose `runtime`/port contract
+changed still refuses in-place `up`, but `berth done` and `berth gc` reclaim it.
+A supervisor that exits on its own does not wedge a workspace: berth reclaims its
+stale control files once the recorded endpoint stops answering and no supervisor
+process is alive. Automatic GC never forces, and an unknown process or engine
+state means preserve the data and inspect the logs.
 
 Read `references/recovery.md` when a berth command fails: error → meaning →
 action, plus what `berth gc` collects and when it refuses.

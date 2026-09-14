@@ -15,6 +15,6 @@
 
 - [ ] `gofmt -l cmd internal` is clean
 - [ ] `go vet ./cmd/... ./internal/...`
-- [ ] `go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./cmd/... ./internal/...`
+- [ ] `go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./cmd/... ./internal/...`
 - [ ] `go test -race ./cmd/... ./internal/...`
 - [ ] Manual verification / CLI test commands executed:
