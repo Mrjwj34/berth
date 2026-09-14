@@ -1,0 +1,26 @@
+#!/bin/sh
+# main is PR-only: the repository ruleset rejects direct pushes (and force
+# pushes, and deletion) for everyone, so a commit made here would only fail at
+# push time. Fail early, locally, instead.
+#
+# Install once per clone:  git config core.hooksPath .githooks
+# Deliberate bypass:       git commit --no-verify
+#
+# A detached HEAD (rebase, cherry-pick, a checked-out tag) is not a branch and
+# is left alone.
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0
+case "$branch" in
+main | master)
+	cat >&2 <<'EOF'
+berth: main is PR-only.
+
+    git switch -c fix/<topic>
+    git push -u origin fix/<topic>
+    gh pr create --fill
+
+Every change lands through a pull request; the remote rejects direct pushes.
+EOF
+	exit 1
+	;;
+esac
+exit 0
