@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: cat "native-${{ runner.os }}.md" >> "$GITHUB_STEP_SUMMARY" || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: validation-native-${{ runner.os }}
@@ -184,7 +184,7 @@ jobs:
         if: always()
         run: cat container-linux.md >> "$GITHUB_STEP_SUMMARY" || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: validation-container-linux
