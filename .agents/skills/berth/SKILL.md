@@ -183,7 +183,9 @@ primary-worktree or shutdown checks. `adopt` is only for linked worktrees, and
 preserving checkout, data and branch even with `--force`. `down` preserves data;
 `reset` wipes it deliberately and only after a verified shutdown. Automatic GC
 never forces, and an unknown process or engine state means preserve the data and
-inspect the logs.
+inspect the logs. A supervisor that exits on its own does not wedge a workspace:
+berth reclaims its stale control files once the recorded endpoint stops answering
+and no supervisor process is alive.
 
 Read `references/recovery.md` when a berth command fails: error → meaning →
 action, plus what `berth gc` collects and when it refuses.
