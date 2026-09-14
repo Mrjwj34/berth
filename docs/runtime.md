@@ -75,8 +75,10 @@ back transactionally.
 
 `down` stops the workspace, preserving its checkout/data and container instance.
 `reset` destroys the stopped runtime, resets private data, recreates it and reruns
-setup. `done` never removes an adopted checkout. Any stop/identity failure blocks
-destructive work. Cancellation of `run` in container mode stops that workspace's
+setup. `done` never removes an adopted checkout. A branch-local runtime/port
+contract change still refuses in-place `up`, but `done` and `gc` stop and release
+the workspace with the stored contract. Any stop or worktree-identity failure
+blocks destructive work. Cancellation of `run` in container mode stops that workspace's
 whole container; sibling services within that workspace stop too, but other
 workspaces remain running.
 

@@ -43,12 +43,17 @@ but before berth registers it leaves an unregistered checkout that can be adopte
 no destructive guess is made. Runtime control endpoints live outside newly created
 native checkouts. PID checks after native shutdown are only used to wait, never to
 kill a potentially reused PID. Native API tokens isolate control endpoints.
+Graceful shutdown is bounded by an injected process-compose `shutdown.timeout_seconds`,
+so the supervisor escalates to SIGKILL without berth killing a PID it did not spawn.
 
 Recovery intent is stored in the existing workspace record, under its operation
-lock: `reset_pending` precedes runtime/data destruction; `removal_head` follows
-teardown/shutdown and precedes checkout removal. Reset retries finish the reset
-before setup. Removal retries retain repository identity checks and delete only
-the recorded commit using [Git's compare-and-delete](https://git-scm.com/docs/git-update-ref).
+lock: `reset_pending` precedes runtime/data destruction; `removal_head` and
+`removal_branch` follow teardown/shutdown and precede checkout removal. A workspace
+is identified by its path and Git directory, not by branch name, so a worktree that
+moves to `fix/*` stays usable. Reset retries finish the reset before setup. Removal
+retries retain repository identity checks, delete only the recorded commit using
+[Git's compare-and-delete](https://git-scm.com/docs/git-update-ref), and delete a
+branch only while it is still the original `berth/<slug>`.
 GC never discards pending removal records or grants them force authority. No
 separate journal service or background recovery process is needed.
 
