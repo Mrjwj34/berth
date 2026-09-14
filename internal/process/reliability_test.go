@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Mrjwj34/berth/internal/config"
 )
 
 func TestClientArgumentsNeverUseDefaultEndpoint(t *testing.T) {
@@ -99,7 +101,7 @@ func TestReadinessMatchesSupervisorProbeState(t *testing.T) {
 }
 func TestRenderPreservesNumericStrings(t *testing.T) {
 	dir := t.TempDir()
-	if err := RenderAt(dir, dir, map[string]any{"x": map[string]any{"command": "1234", "environment": []any{"VALUE=0001"}}}, nil); err != nil {
+	if err := RenderAt(dir, dir, map[string]any{"x": map[string]any{"command": "1234", "environment": []any{"VALUE=0001"}}}, nil, 0); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(PCFile(dir))
@@ -117,5 +119,71 @@ func TestChecksumRejectsCorruption(t *testing.T) {
 	}
 	if err := verifySHA256(p, strings.Repeat("0", 64)); err == nil {
 		t.Fatal("accepted corrupt binary")
+	}
+}
+
+func TestRenderBoundsShutdownAndKeepsProjectBlock(t *testing.T) {
+	dir := t.TempDir()
+	procs := map[string]any{
+		"plain": map[string]any{"command": "sleep 1"},
+		"custom": map[string]any{
+			"command":  "sleep 1",
+			"shutdown": map[string]any{"signal": 9},
+		},
+	}
+	if err := RenderAt(dir, dir, procs, nil, 7); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(PCFile(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "timeout_seconds: 7") {
+		t.Fatalf("shutdown timeout not injected:\n%s", text)
+	}
+	if !strings.Contains(text, "signal: 9") {
+		t.Fatalf("project shutdown block overwritten:\n%s", text)
+	}
+	if strings.Count(text, "timeout_seconds: 7") != 1 {
+		t.Fatalf("injected shutdown bounds into a project-declared block:\n%s", text)
+	}
+	// Zero leaves termination to process-compose, which native Windows needs.
+	off := t.TempDir()
+	if err := RenderAt(off, off, map[string]any{"plain": map[string]any{"command": "sleep 1"}}, nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(PCFile(off))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "shutdown") {
+		t.Fatalf("zero shutdown timeout still injected a block:\n%s", data)
+	}
+}
+
+func TestDownTimeoutHonoursConfig(t *testing.T) {
+	dir := t.TempDir()
+	if got := downTimeout(dir); got != 35*time.Second {
+		t.Fatalf("default down timeout = %s, want 35s", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, config.Filename), []byte("version: 1\nshutdown_timeout_seconds: 90\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := downTimeout(dir); got != 110*time.Second {
+		t.Fatalf("configured down timeout = %s, want 110s", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, config.Filename), []byte("version: 1\nshutdown_timeout_seconds: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := downTimeout(dir); got != 30*time.Second {
+		t.Fatalf("down timeout floor = %s, want 30s", got)
+	}
+}
+
+func TestCleanSupervisorOutputDropsDebugNoise(t *testing.T) {
+	raw := []byte("{\"level\":\"debug\",\"message\":\"Path not found\"}\nprocess-compose down: signal: killed\n")
+	if got := cleanSupervisorOutput(raw); got != "process-compose down: signal: killed" {
+		t.Fatalf("cleaned output = %q", got)
 	}
 }

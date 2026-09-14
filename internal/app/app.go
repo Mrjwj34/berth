@@ -364,15 +364,12 @@ func (a *App) doneLocked(ctx context.Context, ws state.Workspace, force bool) er
 			return err
 		}
 	}
-	s, err := a.session(ctx, ws)
-	if err != nil {
-		return err
-	}
+	s, teardown := a.removalSession(ws)
 	if err := s.Down(ctx); err != nil {
 		return a.failure(ws, err)
 	}
-	if owned && len(s.Config.Hooks.Teardown) > 0 {
-		if err := s.Hooks(ctx, s.Config.Hooks.Teardown, os.Stderr, os.Stderr); err != nil {
+	if owned && len(teardown) > 0 {
+		if err := s.Hooks(ctx, teardown, os.Stderr, os.Stderr); err != nil {
 			cleanup, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			stopErr := s.Down(cleanup)
@@ -398,15 +395,40 @@ func (a *App) doneLocked(ctx context.Context, ws state.Workspace, force bool) er
 		if err != nil {
 			return err
 		}
-		if err := a.update(ctx, ws, func(w *state.Workspace) { w.Phase = "removing"; w.RemovalHead = head; state.Touch(w) }); err != nil {
+		branch := workspaceBranch(ctx, ws)
+		if err := a.update(ctx, ws, func(w *state.Workspace) {
+			w.Phase = "removing"
+			w.RemovalHead = head
+			w.RemovalBranch = branch
+			state.Touch(w)
+		}); err != nil {
 			return err
 		}
-		ws.RemovalHead = head
+		ws.RemovalHead, ws.RemovalBranch = head, branch
 		return a.resumeRemoval(ctx, ws, force)
 	}
 	// Adopted checkouts retain all metadata and data. Unregistering is atomic;
 	// deleting their identity marker first would make failed unregisters unretryable.
 	return a.unregister(ctx, ws)
+}
+
+// removalSession builds the session used to stop and destroy a workspace. A
+// branch-local runtime/port contract change must not strand a registration, so a
+// contract-invalid configuration falls back to the stored workspace contract for
+// shutdown/destroy. Teardown hooks are skipped in that case: they run with the
+// workspace environment, which no longer matches the configuration they were
+// written for.
+func (a *App) removalSession(ws state.Workspace) (*runner.Session, []string) {
+	cfg, _, err := loadConfig(ws.Path)
+	if err == nil {
+		s, newErr := runner.New(cfg, ws)
+		if newErr == nil {
+			return s, s.Config.Hooks.Teardown
+		}
+		err = newErr
+	}
+	fmt.Fprintf(os.Stderr, "berth: warning: %v; reclaiming with the stored runtime contract and skipping teardown hooks\n", err)
+	return runner.Existing(ws), nil
 }
 func (a *App) unregister(ctx context.Context, ws state.Workspace) error {
 	return a.Store.Update(ctx, func(f *state.File) error {

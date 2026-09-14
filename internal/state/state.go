@@ -38,6 +38,7 @@ type Workspace struct {
 	SetupComplete bool           `json:"setup_complete,omitempty"`
 	ResetPending  bool           `json:"reset_pending,omitempty"`
 	RemovalHead   string         `json:"removal_head,omitempty"`
+	RemovalBranch string         `json:"removal_branch,omitempty"`
 	LastError     string         `json:"last_error,omitempty"`
 	Runtime       config.Runtime `json:"runtime,omitempty"`
 	Listen        map[string]int `json:"listen,omitempty"`

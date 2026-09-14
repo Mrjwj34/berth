@@ -45,7 +45,7 @@ func newRoot(info version.Info) *cobra.Command {
 		cmdLS(&asJSON),
 		cmdStatus(&asJSON),
 		cmdPorts(&asJSON),
-		cmdUp(),
+		cmdUp(&asJSON),
 		cmdDown(),
 		cmdLogs(),
 		cmdRun(),

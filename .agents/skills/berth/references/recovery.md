@@ -7,9 +7,9 @@ Read this when a berth command fails or a workspace is in an unknown state.
 | Message | Meaning | Action |
 | --- | --- | --- |
 | `workspace not found; run berth ls or berth adopt` | The current directory is not inside a registered workspace and no slug was given. | `cd` into the path `berth new` printed, or pass the slug. |
-| `port contract changed; create a new workspace` | `berth.yaml` declares different ports or runtime settings than the workspace was created with. | Create a new workspace from the updated branch; in-place edits are refused on purpose. |
+| `port contract changed; create a new workspace` | `berth.yaml` declares different ports or runtime settings than the workspace was created with. | In-place `berth up` is refused on purpose. Reclaim the registration with `berth done`, then create a workspace from the updated branch. |
 | `worktree is dirty; commit changes first` | `berth done` refuses to remove a checkout with uncommitted work. | Commit or discard the changes, then retry. |
-| `work is not preserved: …` | The branch has commits neither merged into the base nor present upstream. | Push or merge the branch, then retry `berth done`. |
+| `work is not preserved: …` | The branch has commits neither merged into the base, patch-equivalent in it, nor present upstream. | Push or merge the branch, then retry `berth done`; a squash whose resulting tree matches the base is already accepted. Otherwise use `berth done --force`. |
 | `refusing to operate on the primary worktree` | `berth adopt` or `berth done` was pointed at the main checkout. | Only linked worktrees are candidates; create one with `berth new`. |
 | `checkout is on a detached HEAD` | `berth adopt` needs a branch, and harness-created worktrees are often detached. | Check out a branch there, or create `berth new <slug>` instead. |
 | `process state unknown; inspect …` | The supervisor socket or port file exists but does not answer. | Preserve the data, read `.berth/process-compose.log` and `berth logs <proc>`, and leave `.berth/` in place. A supervisor that exited on its own is reclaimed automatically: once the recorded endpoint stops answering and no supervisor process is alive, berth removes the stale control files and the workspace counts as stopped. |
@@ -27,16 +27,19 @@ be idempotent for that retry to be safe.
 
 `berth gc` is always explicit and never forced, and it revalidates every candidate
 under the workspace lock. Candidates are: a registration whose directory is gone,
-an idle runtime past `gc.idle_stop_hours`, a stopped and merged workspace older
-than `gc.remove_after_days`, and workspaces above `gc.max_workspaces` for that
-repository. Removal still requires preserved commits and skips active operations;
-`berth gc --dry-run --json` previews the list. Use `berth down` to keep a workspace
-and its data, `berth done` to release it.
+a workspace whose branch configuration no longer matches its stored runtime/port
+contract, an idle runtime past `gc.idle_stop_hours`, a stopped and merged
+workspace older than `gc.remove_after_days`, and workspaces above
+`gc.max_workspaces` for that repository. Removal still requires preserved commits
+and skips active operations; `berth gc --dry-run --json` previews the list. Use
+`berth down` to keep a workspace and its data, `berth done` to release it.
 
 ## Ownership
 
 `berth done` never removes an adopted checkout: it stops the runtime and
 unregisters the workspace, preserving directory, data and branch even with
-`--force`. `--force` cannot bypass ownership, identity, primary-worktree or
-shutdown checks, so when one of them refuses, fix the underlying condition instead
-of escalating.
+`--force`. A workspace is identified by its path and Git directory, not by the
+branch name, so checking out `fix/*` or `hotfix/*` keeps it usable; removal
+deletes a branch only while it is still the original `berth/<slug>`. `--force`
+cannot bypass ownership, worktree identity, primary-worktree or shutdown checks,
+so when one of them refuses, fix the underlying condition instead of escalating.

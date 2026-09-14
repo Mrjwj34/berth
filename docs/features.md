@@ -10,7 +10,7 @@ This guide provides a comprehensive walkthrough of berth concepts, configuration
 
 A workspace in berth combines an isolated Git worktree, a private data directory, dynamically allocated ports, and a set of supervised background processes. Each workspace checked out from Git uses its own branch configuration. Changes made to configuration files in one workspace do not affect other workspaces.
 
-Workspaces are created beside the repository in `<repo>.berths/<slug>` (or under `worktree_root`) on branch `berth/<slug>`, and a slug is lowercase ASCII with digits, `-` or `_` only. The primary checkout is never a workspace, and the commands that take no slug (`berth run`, `berth open`) resolve the workspace from the current directory, so run them from inside the path `berth new` printed.
+Workspaces are created beside the repository in `<repo>.berths/<slug>` (or under `worktree_root`) on branch `berth/<slug>`, and a slug is lowercase ASCII with digits, `-` or `_` only. The branch is a default, not workspace identity: a workspace is identified by its path and Git directory, so checking out `fix/*` or `hotfix/*` keeps `up`, `run` and `done` working, and `BERTH_BRANCH` follows HEAD. The primary checkout is never a workspace, and the commands that take no slug (`berth run`, `berth open`) resolve the workspace from the current directory, so run them from inside the path `berth new` printed.
 
 ### Dual Runtime Modes
 
@@ -49,6 +49,7 @@ Every workspace reads its configuration from berth.yaml located at the root of t
   - cpus: Optional CPU limit such as 2.
   - user: Optional UID and GID override for container processes.
 - ports: List of named ports required by the project, such as web or pg.
+- shutdown_timeout_seconds: How long a managed process may ignore SIGTERM before process-compose sends SIGKILL to its process group. Defaults to 15. Applies to Unix native and container runtimes; native Windows already terminates with taskkill.
 - listen: Mapping of named ports to internal TCP listen ports when using container mode.
 - env: Key-value map of environment variables injected into processes and hooks.
 - copy_dirs: List of repository directories copied into each new worktree using Copy on Write where available.
@@ -66,6 +67,7 @@ Every workspace reads its configuration from berth.yaml located at the root of t
     - period_seconds: Interval between probe attempts.
     - failure_threshold: Consecutive failures before marking the service unready.
   - log_location: Optional per-process log file, as used by the acceptance test. The processes mapping is passed through to process-compose v0.5, so its other documented fields such as depends_on and restart also work.
+  - shutdown: Optional process-compose termination block (command, signal, timeout_seconds, parent_only). When present it is authoritative, and berth does not add its default shutdown bound.
 
 ### Worktree Include File
 
@@ -199,7 +201,7 @@ In container mode, additional Git metadata variables are provided:
 | berth logs proc slug | Stream stdout and stderr logs for a service | |
 | berth run -- cmd | Execute a command within the workspace environment | |
 | berth reset slug | Wipe private data directory and rerun setup hooks | |
-| berth done slug | Verify commit preservation and safely remove workspace | --force |
+| berth done slug | Verify commit preservation and safely remove workspace; also reclaims a workspace whose runtime/port contract changed | --force |
 | berth gc | Clean up orphaned registrations and inactive workspaces | --dry-run, --json |
 | berth doctor | Validate system dependencies and state health | --fix, --json |
 | berth open port slug | Open service publication URL in the host browser | --json |

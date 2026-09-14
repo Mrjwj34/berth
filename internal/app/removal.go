@@ -15,7 +15,13 @@ import (
 // resumeRemoval only has authority to finish the exact removal recorded after
 // teardown and shutdown. Missing checkouts without that record confer no authority.
 func (a *App) resumeRemoval(ctx context.Context, ws state.Workspace, force bool) error {
-	if ws.Ownership != state.Owned || ws.RemovalHead == "" || ws.Branch != worktree.BranchName(ws.Slug) {
+	// Records written before removal_branch existed fall back to the branch that
+	// was registered at creation time.
+	removalBranch := ws.RemovalBranch
+	if removalBranch == "" {
+		removalBranch = ws.Branch
+	}
+	if ws.Ownership != state.Owned || ws.RemovalHead == "" || removalBranch == "" {
 		return fmt.Errorf("invalid workspace removal identity")
 	}
 	main, err := gitx.MainRepo(ctx, ws.Repo)
@@ -65,8 +71,13 @@ func (a *App) resumeRemoval(ctx context.Context, ws state.Workspace, force bool)
 	if err := runner.Existing(ws).Destroy(ctx); err != nil {
 		return a.failure(ws, err)
 	}
-	if err := worktree.DeleteBranch(ctx, ws.Repo, ws.Branch, ws.RemovalHead); err != nil {
-		return a.failure(ws, err)
+	// Only the branch berth created is deleted. A worktree that moved to a
+	// user-owned fix/* or hotfix/* branch is unregistered, and that branch is
+	// left in place for the pull request.
+	if removalBranch == worktree.BranchName(ws.Slug) {
+		if err := worktree.DeleteBranch(ctx, ws.Repo, removalBranch, ws.RemovalHead); err != nil {
+			return a.failure(ws, err)
+		}
 	}
 	return a.unregister(ctx, ws)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Mrjwj34/berth/internal/app"
 	"github.com/Mrjwj34/berth/internal/skill"
+	"github.com/Mrjwj34/berth/internal/state"
 	"github.com/spf13/cobra"
 )
 
@@ -49,12 +50,12 @@ func cmdNew(asJSON *bool) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				if *asJSON {
+					return writeJSON(cmd.OutOrStdout(), ws)
+				}
 				if printPath {
 					fmt.Fprintln(cmd.OutOrStdout(), ws.Path)
 					return nil
-				}
-				if *asJSON {
-					return writeJSON(cmd.OutOrStdout(), ws)
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", ws.Slug)
 				fmt.Fprintf(cmd.OutOrStdout(), "path\t%s\n", ws.Path)
@@ -69,7 +70,7 @@ func cmdNew(asJSON *bool) *cobra.Command {
 	}
 	c.Flags().BoolVar(&up, "up", false, "start processes after setup")
 	c.Flags().StringVar(&base, "base", "", "baseline branch (default: berth.yaml base or main)")
-	c.Flags().BoolVar(&printPath, "print-path", false, "print only the absolute worktree path")
+	c.Flags().BoolVar(&printPath, "print-path", false, "print only the absolute worktree path (--json takes precedence)")
 	return c
 }
 
@@ -203,7 +204,7 @@ func cmdPorts(asJSON *bool) *cobra.Command {
 	}
 }
 
-func cmdUp() *cobra.Command {
+func cmdUp(asJSON *bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   "up [slug]",
 		Short: "Start workspace processes",
@@ -214,7 +215,16 @@ func cmdUp() *cobra.Command {
 				slug = args[0]
 			}
 			return withApp(func(ctx context.Context, a *app.App) error {
-				return a.Up(ctx, slug)
+				if err := a.Up(ctx, slug); err != nil {
+					return err
+				}
+				// Report ports and readiness so callers do not need a second
+				// berth status/ports round trip.
+				ws, err := a.Status(ctx, slug)
+				if err != nil {
+					return err
+				}
+				return printWorkspace(cmd.OutOrStdout(), ws, *asJSON)
 			})
 		},
 	}
@@ -297,10 +307,19 @@ func cmdDone() *cobra.Command {
 				slug = args[0]
 			}
 			return withApp(func(ctx context.Context, a *app.App) error {
+				// Peek before release: after done the registration is gone.
+				adopted := false
+				if ws, err := a.Status(ctx, slug); err == nil {
+					adopted = ws.Ownership == state.Adopted
+				}
 				if err := a.Done(ctx, slug, force); err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "workspace released (adopted checkouts are preserved)")
+				if adopted {
+					fmt.Fprintln(cmd.OutOrStdout(), "workspace released (adopted checkouts are preserved)")
+				} else {
+					fmt.Fprintln(cmd.OutOrStdout(), "workspace released (worktree and data removed)")
+				}
 				return nil
 			})
 		},

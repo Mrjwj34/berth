@@ -31,7 +31,14 @@ type Config struct {
 	Hooks        Hooks             `yaml:"hooks" json:"hooks"`
 	Processes    map[string]any    `yaml:"processes" json:"processes,omitempty"`
 	GC           GC                `yaml:"gc" json:"gc"`
+	// ShutdownTimeoutSeconds is how long a managed process may take to exit after
+	// SIGTERM before process-compose sends SIGKILL to its process group. Values
+	// below 1 use DefaultShutdownTimeoutSeconds.
+	ShutdownTimeoutSeconds int `yaml:"shutdown_timeout_seconds,omitempty" json:"shutdown_timeout_seconds,omitempty"`
 }
+
+// DefaultShutdownTimeoutSeconds bounds graceful shutdown for managed processes.
+const DefaultShutdownTimeoutSeconds = 15
 
 type Hooks struct {
 	Setup    []string `yaml:"setup" json:"setup,omitempty"`
@@ -46,10 +53,11 @@ type GC struct {
 
 func Defaults() Config {
 	return Config{
-		Version:   1,
-		Base:      "main",
-		Env:       map[string]string{},
-		Processes: map[string]any{},
+		Version:                1,
+		Base:                   "main",
+		Env:                    map[string]string{},
+		Processes:              map[string]any{},
+		ShutdownTimeoutSeconds: DefaultShutdownTimeoutSeconds,
 	}
 }
 
@@ -178,6 +186,9 @@ func (c *Config) validate() error {
 	}
 	if c.GC.IdleStopHours < 0 || c.GC.RemoveAfterDays < 0 || c.GC.MaxWorkspaces < 0 {
 		return fmt.Errorf("gc values must be nonnegative")
+	}
+	if c.ShutdownTimeoutSeconds < 0 {
+		return fmt.Errorf("shutdown_timeout_seconds must be nonnegative")
 	}
 	return nil
 }
