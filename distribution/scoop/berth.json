@@ -1,16 +1,16 @@
 {
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Fast, daemonless local workspaces for parallel coding agents",
     "homepage": "https://github.com/Mrjwj34/berth",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/Mrjwj34/berth/releases/download/v0.3.0/berth_0.3.0_windows_amd64.zip",
-            "hash": "f54c84498f5e1487a0a2c2d9a94fe228da89b849ce51848553da8eb0a92f3e05"
+            "url": "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_windows_amd64.zip",
+            "hash": "b2e58eb18557d7a1e80c40082c893a7dfec0f182f2db2f4698be5448d5166679"
         },
         "arm64": {
-            "url": "https://github.com/Mrjwj34/berth/releases/download/v0.3.0/berth_0.3.0_windows_arm64.zip",
-            "hash": "75bdd2a36d71913f1d775e89f68d6083a8d2621f07f5edf86e8d85878b3ac89d"
+            "url": "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_windows_arm64.zip",
+            "hash": "72f52ebb280ca68c394d871d1c3a1b5994e9cb09dd902de657b30bfea0c39382"
         }
     },
     "bin": "berth.exe",

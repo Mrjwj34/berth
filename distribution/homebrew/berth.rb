@@ -2,26 +2,26 @@
 class Berth < Formula
   desc "Fast, daemonless local workspaces for parallel coding agents"
   homepage "https://github.com/Mrjwj34/berth"
-  version "0.3.0"
+  version "0.4.0"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/Mrjwj34/berth/releases/download/v0.3.0/berth_0.3.0_darwin_arm64.tar.gz"
-      sha256 "b332e6e7d1cbffac5ee086c62543ab1b737b9d34c69c0418d58ff9d18e56b424"
+      url "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_darwin_arm64.tar.gz"
+      sha256 "dd7cd28bcc46d2660ef7706ed8c719391f5126438e6f640195934f97e7009a46"
     else
-      url "https://github.com/Mrjwj34/berth/releases/download/v0.3.0/berth_0.3.0_darwin_amd64.tar.gz"
-      sha256 "1190abff29a4b39189fd1f8938d8554406748c728a2db82120ee16e14baa7a62"
+      url "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_darwin_amd64.tar.gz"
+      sha256 "c917c1979f1d00349ead4de436742ed66b5be506ec214f7e98c53ee9dbab9b95"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/Mrjwj34/berth/releases/download/v0.3.0/berth_0.3.0_linux_arm64.tar.gz"
-      sha256 "a9dcbdff206c8b871cf950b8dffd1a5e91bbfaac6d9551f624c73938feda4686"
+      url "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_linux_arm64.tar.gz"
+      sha256 "4032e4f7cd50185d0c692f733fa862e9f7e64ecec56abd4b00035d5c1652ce67"
     else
-      url "https://github.com/Mrjwj34/berth/releases/download/v0.3.0/berth_0.3.0_linux_amd64.tar.gz"
-      sha256 "3d4888f493cf2bb8755302bb7118e0b07c2be53390756ca7608d5c6ab5ac2f7a"
+      url "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_linux_amd64.tar.gz"
+      sha256 "09728d50e2eda7f23ec5ed31b613aef448204ec82c13738c0032d4b78a5f83b0"
     end
   end
 
