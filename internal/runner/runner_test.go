@@ -70,20 +70,23 @@ func TestMissingEngineFailsClosed(t *testing.T) {
 func TestEffectiveShutdownTimeout(t *testing.T) {
 	cfg := config.Defaults()
 	native := state.Workspace{Runtime: config.Runtime{Backend: "native"}}
-	if got := effectiveShutdownTimeout(&cfg, native); got != config.DefaultShutdownTimeoutSeconds {
-		t.Fatalf("native default = %d", got)
+	wantNative := config.DefaultShutdownTimeoutSeconds
+	if runtime.GOOS == "windows" {
+		wantNative = 0
+	}
+	if got := effectiveShutdownTimeout(&cfg, native); got != wantNative {
+		t.Fatalf("native default = %d, want %d", got, wantNative)
 	}
 	cfg.ShutdownTimeoutSeconds = 30
-	if got := effectiveShutdownTimeout(&cfg, native); got != 30 {
-		t.Fatalf("native configured = %d", got)
+	wantConfigured := 30
+	if runtime.GOOS == "windows" {
+		wantConfigured = 0
+	}
+	if got := effectiveShutdownTimeout(&cfg, native); got != wantConfigured {
+		t.Fatalf("native configured = %d, want %d", got, wantConfigured)
 	}
 	container := state.Workspace{Runtime: config.Runtime{Backend: "container", Image: "berth-test:local"}}
 	if got := effectiveShutdownTimeout(&cfg, container); got != 30 {
-		t.Fatalf("container = %d", got)
-	}
-	if runtime.GOOS == "windows" {
-		if got := effectiveShutdownTimeout(&cfg, native); got != 0 {
-			t.Fatalf("native Windows = %d, want 0", got)
-		}
+		t.Fatalf("container = %d, want 30", got)
 	}
 }
