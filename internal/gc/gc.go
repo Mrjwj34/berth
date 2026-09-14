@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Mrjwj34/berth/internal/config"
+	"github.com/Mrjwj34/berth/internal/gitx"
 	"github.com/Mrjwj34/berth/internal/runner"
 	"github.com/Mrjwj34/berth/internal/state"
 	"github.com/Mrjwj34/berth/internal/worktree"
@@ -156,7 +157,7 @@ func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, sn
 	}
 	kind, reason := "", ""
 	if cfg.GC.RemoveAfterDays > 0 && age >= time.Duration(cfg.GC.RemoveAfterDays)*24*time.Hour {
-		merged, err := worktree.MergedInto(ctx, w.Repo, w.Branch, w.Base)
+		merged, err := mergedIntoHead(ctx, w)
 		if err != nil {
 			return err
 		}
@@ -168,6 +169,15 @@ func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, sn
 	if kind == "" && cfg.GC.MaxWorkspaces > 0 && counts[w.Repo] > cfg.GC.MaxWorkspaces {
 		kind = "evict"
 		reason = "over quota; commits preserved"
+	}
+	if kind == "" {
+		// A workspace whose branch-local runtime/port contract no longer matches
+		// the stored contract cannot be started in place. Explicit GC reclaims the
+		// registration; commits must still be preserved.
+		if _, err := runner.New(&cfg, w); err != nil {
+			kind = "reclaim_contract"
+			reason = "runtime/port contract changed; workspace cannot start in place"
+		}
 	}
 	if kind == "" {
 		return nil
@@ -187,4 +197,15 @@ func collect(ctx context.Context, st *state.Store, opts Options, rep *Report, sn
 	counts[w.Repo]--
 	add(kind, reason)
 	return nil
+}
+
+// mergedIntoHead checks the current checkout instead of the registered branch,
+// which may have moved to a fix/* or hotfix/* branch, and therefore has no
+// relation to the branch berth created.
+func mergedIntoHead(ctx context.Context, w state.Workspace) (bool, error) {
+	head, err := gitx.Run(ctx, w.Path, "rev-parse", "HEAD")
+	if err != nil {
+		return false, err
+	}
+	return worktree.MergedInto(ctx, w.Repo, head, w.Base)
 }

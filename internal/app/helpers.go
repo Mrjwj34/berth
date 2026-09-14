@@ -202,13 +202,9 @@ func validateIdentity(ctx context.Context, ws state.Workspace) error {
 	if !worktree.SamePath(dir, ws.GitDir) {
 		return fmt.Errorf("worktree Git identity changed")
 	}
-	branch, err := gitx.CurrentBranch(ctx, ws.Path)
-	if err != nil {
-		return err
-	}
-	if branch != ws.Branch {
-		return fmt.Errorf("workspace branch changed from %s to %s", ws.Branch, branch)
-	}
+	// The registered branch is a default for new worktrees, not workspace
+	// identity. A workspace is identified by its path, Git directory and identity
+	// marker, so checking out fix/* or hotfix/* keeps it usable.
 	st, err := os.Lstat(filepath.Join(ws.Path, ".berth"))
 	if err != nil {
 		return err
@@ -243,11 +239,24 @@ func (a *App) session(ctx context.Context, ws state.Workspace) (*runner.Session,
 	if err := validateIdentity(ctx, ws); err != nil {
 		return nil, err
 	}
+	// Identity follows the path, not a fixed branch name: report the branch the
+	// worktree is actually on, so BERTH_BRANCH matches the current checkout.
+	ws.Branch = workspaceBranch(ctx, ws)
 	cfg, _, err := loadConfig(ws.Path)
 	if err != nil {
 		return nil, err
 	}
 	return runner.New(cfg, ws)
+}
+
+// workspaceBranch returns the worktree's current branch, falling back to the
+// registered branch when HEAD is detached or Git does not answer.
+func workspaceBranch(ctx context.Context, ws state.Workspace) string {
+	branch, err := gitx.CurrentBranch(ctx, ws.Path)
+	if err != nil || branch == "" || branch == "HEAD" {
+		return ws.Branch
+	}
+	return branch
 }
 func (a *App) writeEnv(s *runner.Session) error {
 	rel := s.Config.EnvFile
@@ -269,7 +278,7 @@ func (a *App) writeEnv(s *runner.Session) error {
 	return config.WriteEnvFile(path, s.Env())
 }
 func (a *App) view(ctx context.Context, ws state.Workspace, withEnv bool) (*WorkspaceView, error) {
-	v := &WorkspaceView{Slug: ws.Slug, Path: ws.Path, Repo: ws.Repo, Branch: ws.Branch, Ports: ws.Ports, Listen: ws.Listen, CreatedAt: ws.CreatedAt, LastUsed: ws.LastUsedAt, Phase: ws.Phase, Ownership: ws.Ownership, Error: ws.LastError}
+	v := &WorkspaceView{Slug: ws.Slug, Path: ws.Path, Repo: ws.Repo, Branch: workspaceBranch(ctx, ws), Ports: ws.Ports, Listen: ws.Listen, CreatedAt: ws.CreatedAt, LastUsed: ws.LastUsedAt, Phase: ws.Phase, Ownership: ws.Ownership, Error: ws.LastError}
 	cfg, _, err := loadConfig(ws.Path)
 	if err != nil {
 		v.Error = err.Error()
