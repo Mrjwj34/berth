@@ -92,7 +92,15 @@ func Add(ctx context.Context, repo, path, branch, startPoint string) error {
 		return fmt.Errorf("worktree path %s already exists. Use berth attach or choose another slug", path)
 	}
 	if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", startPoint); err != nil {
-		return fmt.Errorf("base branch %q not found. Set base: in berth.yaml or pass --base", startPoint)
+		// remote.<name>.fetch can be narrower than refs/heads/*, so a base such
+		// as origin/main exists on the remote without a local remote-tracking
+		// ref. Fetch exactly that ref instead of relying on the caller.
+		if _, ferr := fetchRemoteBase(ctx, repo, startPoint); ferr != nil {
+			return fmt.Errorf("base %q is missing and fetching it failed: %w. Check remote.<name>.fetch or pass --base", startPoint, ferr)
+		}
+		if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", startPoint); err != nil {
+			return fmt.Errorf("base branch %q not found. Set base: in berth.yaml or pass --base", startPoint)
+		}
 	}
 	if _, err := gitx.Run(ctx, repo, "show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
 		_, err = gitx.Run(ctx, repo, "worktree", "add", path, branch)
@@ -106,6 +114,35 @@ func Add(ctx context.Context, repo, path, branch, startPoint string) error {
 		return fmt.Errorf("git worktree add: %w", err)
 	}
 	return nil
+}
+
+// fetchRemoteBase materializes refs/remotes/<remote>/<branch> for a base such as
+// origin/main when the configured fetch spec does not create it. It reports
+// false when the ref does not name a configured remote.
+func fetchRemoteBase(ctx context.Context, repo, ref string) (bool, error) {
+	remote, branch, ok := strings.Cut(ref, "/")
+	if !ok || remote == "" || branch == "" {
+		return false, nil
+	}
+	remotes, err := gitx.Run(ctx, repo, "remote")
+	if err != nil {
+		return false, err
+	}
+	known := false
+	for _, name := range strings.Fields(remotes) {
+		if name == remote {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return false, nil
+	}
+	target := "refs/remotes/" + remote + "/" + branch
+	if _, err := gitx.Run(ctx, repo, "fetch", "--no-tags", remote, "refs/heads/"+branch+":"+target); err != nil {
+		return false, fmt.Errorf("git fetch %s refs/heads/%s:%s: %w", remote, branch, target, err)
+	}
+	return true, nil
 }
 
 // ValidateTarget protects the primary checkout and verifies Git ownership even
@@ -252,7 +289,7 @@ func Unpublished(ctx context.Context, path string) (bool, string, error) {
 	if branch == "HEAD" {
 		return true, "detached HEAD", nil
 	}
-	upstream, err := gitx.Run(ctx, path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	upstream, err := resolveUpstream(ctx, path, branch)
 	if err != nil {
 		return true, "no upstream (push the branch or use --force)", nil
 	}
@@ -270,21 +307,57 @@ func Unpublished(ctx context.Context, path string) (bool, string, error) {
 	return false, "", nil
 }
 
-func MergedInto(ctx context.Context, repo, branch, base string) (bool, error) {
+// resolveUpstream prefers the configured upstream but falls back to the
+// conventional remote-tracking ref. A narrow remote.origin.fetch leaves
+// branch.<name>.remote set without creating origin/<name>, so @{upstream} can
+// fail even though the branch was pushed.
+func resolveUpstream(ctx context.Context, path, branch string) (string, error) {
+	if ref, err := gitx.Run(ctx, path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"); err == nil {
+		// A bare local branch name means the configured upstream is not a
+		// remote-tracking branch, so do not trust it.
+		if strings.Contains(ref, "/") {
+			return ref, nil
+		}
+	}
+	remotes, err := gitx.Run(ctx, path, "remote")
+	if err != nil {
+		return "", err
+	}
+	for _, remote := range strings.Fields(remotes) {
+		ref := "refs/remotes/" + remote + "/" + branch
+		if _, err := gitx.Run(ctx, path, "rev-parse", "--verify", "--quiet", ref); err == nil {
+			return remote + "/" + branch, nil
+		}
+	}
+	return "", fmt.Errorf("no remote-tracking branch for %s", branch)
+}
+
+func MergedInto(ctx context.Context, repo, rev, base string) (bool, error) {
 	if base == "" {
 		return false, fmt.Errorf("merge base is not configured")
 	}
-	if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", branch+"^{commit}"); err != nil {
+	if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", rev+"^{commit}"); err != nil {
 		return false, err
 	}
-	for _, ref := range []string{base, "origin/" + base} {
+	refs := []string{base, "origin/" + base}
+	if remotes, err := gitx.Run(ctx, repo, "remote"); err == nil {
+		for _, remote := range strings.Fields(remotes) {
+			refs = append(refs, remote+"/"+base)
+		}
+	}
+	seen := map[string]bool{}
+	for _, ref := range refs {
+		if seen[ref] {
+			continue
+		}
+		seen[ref] = true
 		if _, err := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}"); err != nil {
 			if ctx.Err() != nil {
 				return false, ctx.Err()
 			}
 			continue
 		}
-		if _, err := gitx.Run(ctx, repo, "merge-base", "--is-ancestor", branch, ref); err == nil {
+		if _, err := gitx.Run(ctx, repo, "merge-base", "--is-ancestor", rev, ref); err == nil {
 			return true, nil
 		} else {
 			var exit *exec.ExitError
@@ -292,12 +365,55 @@ func MergedInto(ctx context.Context, repo, branch, base string) (bool, error) {
 				return false, err
 			}
 		}
+		// A squash merge or cherry-pick produces a new commit, so ancestry does
+		// not hold even though the work is present. Accept patch-equivalent
+		// commits, then an identical tree at the base tip.
+		equivalent, err := patchEquivalent(ctx, repo, ref, rev)
+		if err != nil {
+			return false, err
+		}
+		if equivalent {
+			return true, nil
+		}
+		if sameTree(ctx, repo, ref, rev) {
+			return true, nil
+		}
 	}
 	return false, nil
 }
 
+// patchEquivalent reports whether every commit that rev adds has an equivalent
+// patch already in ref. git cherry prints '-' for such commits.
+func patchEquivalent(ctx context.Context, repo, ref, rev string) (bool, error) {
+	out, err := gitx.Run(ctx, repo, "cherry", ref, rev)
+	if err != nil {
+		return false, err
+	}
+	if strings.TrimSpace(out) == "" {
+		return false, nil
+	}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "-") {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func sameTree(ctx context.Context, repo, a, b string) bool {
+	treeA, errA := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", a+"^{tree}")
+	treeB, errB := gitx.Run(ctx, repo, "rev-parse", "--verify", "--end-of-options", b+"^{tree}")
+	return errA == nil && errB == nil && treeA == treeB
+}
+
 // Preserved verifies actual HEAD, not a stale registered branch. A clean tree
-// alone is insufficient: every commit must be merged or present upstream.
+// alone is insufficient: every commit must be merged, patch-equivalent in the
+// base, share the base tip's tree (the usual squash result), or be present
+// upstream.
 func Preserved(ctx context.Context, repo, path, base string) error {
 	dirty, detail, err := Dirty(ctx, path)
 	if err != nil {
@@ -322,7 +438,7 @@ func Preserved(ctx context.Context, repo, path, base string) error {
 		return err
 	}
 	if unpublished {
-		return fmt.Errorf("work is not preserved: %s; push or merge it before removal", why)
+		return fmt.Errorf("work is not preserved: %s; push or merge it, or rerun berth done --force if the pull request was squash-merged", why)
 	}
 	return nil
 }
