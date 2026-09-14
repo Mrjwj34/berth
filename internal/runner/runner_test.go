@@ -5,6 +5,7 @@ import (
 	"github.com/Mrjwj34/berth/internal/config"
 	"github.com/Mrjwj34/berth/internal/state"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -63,5 +64,26 @@ func TestMissingEngineFailsClosed(t *testing.T) {
 	s.Workspace.Runtime.Engine = filepath.Join(t.TempDir(), "missing-engine")
 	if err := s.Prepare(context.Background()); err == nil {
 		t.Fatal("fell back to host")
+	}
+}
+
+func TestEffectiveShutdownTimeout(t *testing.T) {
+	cfg := config.Defaults()
+	native := state.Workspace{Runtime: config.Runtime{Backend: "native"}}
+	if got := effectiveShutdownTimeout(&cfg, native); got != config.DefaultShutdownTimeoutSeconds {
+		t.Fatalf("native default = %d", got)
+	}
+	cfg.ShutdownTimeoutSeconds = 30
+	if got := effectiveShutdownTimeout(&cfg, native); got != 30 {
+		t.Fatalf("native configured = %d", got)
+	}
+	container := state.Workspace{Runtime: config.Runtime{Backend: "container", Image: "berth-test:local"}}
+	if got := effectiveShutdownTimeout(&cfg, container); got != 30 {
+		t.Fatalf("container = %d", got)
+	}
+	if runtime.GOOS == "windows" {
+		if got := effectiveShutdownTimeout(&cfg, native); got != 0 {
+			t.Fatalf("native Windows = %d, want 0", got)
+		}
 	}
 }

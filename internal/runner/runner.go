@@ -110,7 +110,7 @@ func (s *Session) Up(ctx context.Context) error {
 	if err := s.Prepare(ctx); err != nil {
 		return err
 	}
-	if err := process.RenderAt(s.Workspace.Path, s.Plan().WorkingDir, s.Config.Processes, s.Env(), s.Config.ShutdownTimeoutSeconds); err != nil {
+	if err := process.RenderAt(s.Workspace.Path, s.Plan().WorkingDir, s.Config.Processes, s.Env(), effectiveShutdownTimeout(s.Config, s.Workspace)); err != nil {
 		return err
 	}
 	if s.Workspace.Runtime.Kind() == "native" {
@@ -130,6 +130,22 @@ func (s *Session) Up(ctx context.Context) error {
 	child, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	return process.WaitReady(child, s.Status)
+}
+
+// effectiveShutdownTimeout bounds graceful shutdown for the session's runtime.
+// Native Windows keeps the supervisor default: process-compose stops a native
+// Windows process with taskkill /T /F, which cannot be ignored, and its timed
+// shutdown path waits on process exit in a way that breaks `process-compose down`
+// on Windows. Containers run Linux and use the bound on every host.
+func effectiveShutdownTimeout(cfg *config.Config, ws state.Workspace) int {
+	shutdown := cfg.ShutdownTimeoutSeconds
+	if shutdown <= 0 {
+		shutdown = config.DefaultShutdownTimeoutSeconds
+	}
+	if runtime.GOOS == "windows" && ws.Runtime.Kind() == "native" {
+		return 0
+	}
+	return shutdown
 }
 
 // warnNativeWindowsCommands explains a platform limitation before it turns into

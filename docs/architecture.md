@@ -43,8 +43,10 @@ but before berth registers it leaves an unregistered checkout that can be adopte
 no destructive guess is made. Runtime control endpoints live outside newly created
 native checkouts. PID checks after native shutdown are only used to wait, never to
 kill a potentially reused PID. Native API tokens isolate control endpoints.
-Graceful shutdown is bounded by an injected process-compose `shutdown.timeout_seconds`,
-so the supervisor escalates to SIGKILL without berth killing a PID it did not spawn.
+Graceful shutdown is bounded by an injected process-compose `shutdown.timeout_seconds`
+on Unix native and container runtimes, so the supervisor escalates to SIGKILL
+without berth killing a PID it did not spawn. Native Windows keeps the supervisor
+default because process-compose already terminates with `taskkill /T /F`.
 
 Recovery intent is stored in the existing workspace record, under its operation
 lock: `reset_pending` precedes runtime/data destruction; `removal_head` and

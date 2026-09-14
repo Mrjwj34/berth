@@ -49,7 +49,7 @@ Every workspace reads its configuration from berth.yaml located at the root of t
   - cpus: Optional CPU limit such as 2.
   - user: Optional UID and GID override for container processes.
 - ports: List of named ports required by the project, such as web or pg.
-- shutdown_timeout_seconds: How long a managed process may ignore SIGTERM before process-compose sends SIGKILL to its process group. Defaults to 15.
+- shutdown_timeout_seconds: How long a managed process may ignore SIGTERM before process-compose sends SIGKILL to its process group. Defaults to 15. Applies to Unix native and container runtimes; native Windows already terminates with taskkill.
 - listen: Mapping of named ports to internal TCP listen ports when using container mode.
 - env: Key-value map of environment variables injected into processes and hooks.
 - copy_dirs: List of repository directories copied into each new worktree using Copy on Write where available.

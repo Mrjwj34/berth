@@ -72,8 +72,9 @@ func PortFile(worktree string) string {
 }
 
 // RenderAt keeps host paths out of configurations executed inside a runtime.
-// shutdownSeconds, when positive, bounds how long a process may ignore SIGTERM
-// before process-compose kills its process group.
+// shutdownSeconds greater than zero bounds how long a process may ignore SIGTERM
+// before process-compose kills its process group; zero leaves termination to the
+// supervisor's default.
 func RenderAt(worktree, workingDir string, processes map[string]any, env map[string]string, shutdownSeconds int) error {
 	if len(processes) == 0 {
 		return nil
@@ -86,9 +87,6 @@ func RenderAt(worktree, workingDir string, processes map[string]any, env map[str
 	envList := make([]any, 0, len(env))
 	for k, v := range env {
 		envList = append(envList, k+"="+v)
-	}
-	if shutdownSeconds <= 0 {
-		shutdownSeconds = config.DefaultShutdownTimeoutSeconds
 	}
 	for name, raw := range procs {
 		proc, ok := raw.(map[string]any)
@@ -119,8 +117,10 @@ func RenderAt(worktree, workingDir string, processes map[string]any, env map[str
 		// Bound graceful shutdown so a process that ignores SIGTERM cannot make
 		// process-compose down wait forever. A shutdown block declared by the
 		// project is authoritative and never rewritten.
-		if _, exists := proc["shutdown"]; !exists {
-			proc["shutdown"] = map[string]any{"timeout_seconds": shutdownSeconds}
+		if shutdownSeconds > 0 {
+			if _, exists := proc["shutdown"]; !exists {
+				proc["shutdown"] = map[string]any{"timeout_seconds": shutdownSeconds}
+			}
 		}
 		procs[name] = proc
 	}

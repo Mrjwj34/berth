@@ -16,7 +16,7 @@ creating a workspace.
 | `runtime.image` | Prebuilt Linux image; container only and mandatory. |
 | `runtime.user`, `runtime.memory`, `runtime.cpus` | Optional container overrides, e.g. `2g`, `2`. Native mode rejects them. |
 | `ports` | Named ports such as `[web, pg]`. Port names become `BERTH_PORT_<NAME>`; the name `pc` is reserved. |
-| `shutdown_timeout_seconds` | How long a managed process may ignore `SIGTERM` before process-compose sends `SIGKILL` to its process group; defaults to `15`. |
+| `shutdown_timeout_seconds` | How long a managed process may ignore `SIGTERM` before process-compose sends `SIGKILL` to its process group; defaults to `15`. Applies to Unix native and container runtimes; native Windows already terminates with `taskkill`. |
 | `listen` | Container listen port per declared port, e.g. `{web: 8080}`; every declared port needs one. |
 | `env` | Extra variables for every process, hook and `berth run`. Keys may not start with `BERTH_`; `GIT_DIR` and `GIT_WORK_TREE` are reserved. Values stay single-line; `${VAR}` and `$VAR` expand from the environment contract. |
 | `env_file` | Repository-relative file berth writes with a managed `# BEGIN BERTH`/`# END BERTH` block, for host tools that read dotenv files. |

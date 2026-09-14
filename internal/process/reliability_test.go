@@ -148,6 +148,18 @@ func TestRenderBoundsShutdownAndKeepsProjectBlock(t *testing.T) {
 	if strings.Count(text, "timeout_seconds: 7") != 1 {
 		t.Fatalf("injected shutdown bounds into a project-declared block:\n%s", text)
 	}
+	// Zero leaves termination to process-compose, which native Windows needs.
+	off := t.TempDir()
+	if err := RenderAt(off, off, map[string]any{"plain": map[string]any{"command": "sleep 1"}}, nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(PCFile(off))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "shutdown") {
+		t.Fatalf("zero shutdown timeout still injected a block:\n%s", data)
+	}
 }
 
 func TestDownTimeoutHonoursConfig(t *testing.T) {
