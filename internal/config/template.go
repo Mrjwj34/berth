@@ -7,6 +7,7 @@ runtime:
   backend: native
 # Native mode: programs must accept a configurable port/data path.
 # ports: [web]
+# shutdown_timeout_seconds: 15  # SIGKILL the process group after this long
 # env:
 #   PORT: ${BERTH_PORT_WEB}
 # processes:

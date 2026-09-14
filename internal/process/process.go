@@ -72,7 +72,9 @@ func PortFile(worktree string) string {
 }
 
 // RenderAt keeps host paths out of configurations executed inside a runtime.
-func RenderAt(worktree, workingDir string, processes map[string]any, env map[string]string) error {
+// shutdownSeconds, when positive, bounds how long a process may ignore SIGTERM
+// before process-compose kills its process group.
+func RenderAt(worktree, workingDir string, processes map[string]any, env map[string]string, shutdownSeconds int) error {
 	if len(processes) == 0 {
 		return nil
 	}
@@ -84,6 +86,9 @@ func RenderAt(worktree, workingDir string, processes map[string]any, env map[str
 	envList := make([]any, 0, len(env))
 	for k, v := range env {
 		envList = append(envList, k+"="+v)
+	}
+	if shutdownSeconds <= 0 {
+		shutdownSeconds = config.DefaultShutdownTimeoutSeconds
 	}
 	for name, raw := range procs {
 		proc, ok := raw.(map[string]any)
@@ -111,6 +116,12 @@ func RenderAt(worktree, workingDir string, processes map[string]any, env map[str
 			}
 		}
 		proc["environment"] = append(append([]any{}, envList...), existing...)
+		// Bound graceful shutdown so a process that ignores SIGTERM cannot make
+		// process-compose down wait forever. A shutdown block declared by the
+		// project is authoritative and never rewritten.
+		if _, exists := proc["shutdown"]; !exists {
+			proc["shutdown"] = map[string]any{"timeout_seconds": shutdownSeconds}
+		}
 		procs[name] = proc
 	}
 	doc := map[string]any{
@@ -244,7 +255,7 @@ func Down(ctx context.Context, worktree string) error {
 	if err != nil {
 		return err
 	}
-	child, cancel := context.WithTimeout(ctx, 20*time.Second)
+	child, cancel := context.WithTimeout(ctx, downTimeout(worktree))
 	defer cancel()
 	control, err := clientArgs(worktree, readPCPort(worktree))
 	if err != nil {
@@ -255,7 +266,7 @@ func Down(ctx context.Context, worktree string) error {
 	cmd.Env = pcEnviron(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("process-compose down: %w\n%s", err, out)
+		return fmt.Errorf("process-compose down: %w\n%s", err, cleanSupervisorOutput(out))
 	}
 	// Do not delete data until the previously observed managed processes exited.
 	// PID reuse only causes conservative retention; no PID is killed here.
@@ -284,6 +295,34 @@ func Down(ctx context.Context, worktree string) error {
 		return err
 	}
 	return nil
+}
+
+// downTimeout leaves room for process-compose to escalate to SIGKILL after the
+// workspace's shutdown timeout, so the local client is not killed first.
+func downTimeout(worktree string) time.Duration {
+	grace := config.DefaultShutdownTimeoutSeconds
+	if cfg, err := config.Load(filepath.Join(worktree, config.Filename)); err == nil && cfg.ShutdownTimeoutSeconds > 0 {
+		grace = cfg.ShutdownTimeoutSeconds
+	}
+	d := time.Duration(grace)*time.Second + 20*time.Second
+	if d < 30*time.Second {
+		d = 30 * time.Second
+	}
+	return d
+}
+
+// cleanSupervisorOutput drops process-compose's debug chatter, which otherwise
+// buries the actual failure (for example signal: killed).
+func cleanSupervisorOutput(out []byte) string {
+	var lines []string
+	for _, line := range strings.Split(string(out), "\n") {
+		text := strings.TrimSpace(line)
+		if text == "" || strings.Contains(text, `"level":"debug"`) {
+			continue
+		}
+		lines = append(lines, text)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func Status(ctx context.Context, worktree string) ([]Proc, error) {

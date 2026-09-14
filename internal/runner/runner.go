@@ -110,7 +110,7 @@ func (s *Session) Up(ctx context.Context) error {
 	if err := s.Prepare(ctx); err != nil {
 		return err
 	}
-	if err := process.RenderAt(s.Workspace.Path, s.Plan().WorkingDir, s.Config.Processes, s.Env()); err != nil {
+	if err := process.RenderAt(s.Workspace.Path, s.Plan().WorkingDir, s.Config.Processes, s.Env(), s.Config.ShutdownTimeoutSeconds); err != nil {
 		return err
 	}
 	if s.Workspace.Runtime.Kind() == "native" {
