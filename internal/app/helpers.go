@@ -297,6 +297,8 @@ func (a *App) view(ctx context.Context, ws state.Workspace, withEnv bool) (*Work
 	v.Running = running
 	if err != nil {
 		v.Error = err.Error()
+	} else if !running && v.Phase == "running" {
+		v.Phase = "stopped"
 	}
 	if running {
 		procs, err := s.Status(ctx)

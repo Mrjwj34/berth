@@ -91,6 +91,30 @@ func TestNewLSDoneLifecycle(t *testing.T) {
 	}
 }
 
+func TestStatusReconcilesStoppedRuntimePhase(t *testing.T) {
+	a, _ := testApp(t)
+	ctx := context.Background()
+	created, err := a.New(ctx, "exited", "main", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws, err := a.resolve(ctx, created.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.record(ctx, ws, "running", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := a.Status(ctx, created.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Running || status.Phase != "stopped" {
+		t.Fatalf("status = running %v, phase %q; want a stopped runtime", status.Running, status.Phase)
+	}
+}
+
 func TestGCReclaimsVanished(t *testing.T) {
 	t.Setenv("BERTH_HOME", t.TempDir())
 	ctx := context.Background()
