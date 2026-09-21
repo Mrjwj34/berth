@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -383,22 +386,49 @@ func DecodeStatus(data []byte) ([]Proc, error) {
 	return procs, nil
 }
 
-func Logs(ctx context.Context, worktree, name string, stdout, stderr io.Writer) error {
-	control, err := clientArgs(worktree, readPCPort(worktree))
+func Logs(ctx context.Context, worktree, name string, stdout, _ io.Writer) error {
+	if err := validateToken(TokenFile(worktree)); err != nil {
+		return err
+	}
+	token, err := os.ReadFile(TokenFile(worktree))
 	if err != nil {
 		return err
 	}
-	bin, err := LookPath()
+
+	client := &http.Client{}
+	address := "http://127.0.0.1:" + strconv.Itoa(readPCPort(worktree))
+	if runtime.GOOS != "windows" {
+		address = "http://localhost"
+		client.Transport = &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", Socket(worktree))
+		}}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address+"/process/logs/"+url.PathEscape(name)+"/0/0", nil)
 	if err != nil {
 		return err
 	}
-	args := append([]string{"process", "logs", name}, control...)
-	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Dir = worktree
-	cmd.Env = pcEnviron(os.Environ())
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
+	req.Header.Set("X-PC-Token-Key", strings.TrimSpace(string(token)))
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("read process logs: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("read process logs: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var result struct {
+		Logs []string `json:"logs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode process logs: %w", err)
+	}
+	for _, line := range result.Logs {
+		if _, err := fmt.Fprintln(stdout, line); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // IsRunning distinguishes absence from an unresponsive supervisor. Destructive
