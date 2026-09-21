@@ -94,7 +94,7 @@ jobs:
     steps:
       - name: Get PR context
         id: pr-context
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           OCR_NO_UPDATE: "1"
         with:
@@ -116,7 +116,7 @@ jobs:
             core.setOutput('pr_title', pullRequest.title);
 
       - name: Checkout trusted base
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.pr-context.outputs.checkout_ref }}
           persist-credentials: false
@@ -162,7 +162,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Run OpenCodeReview
-        uses: alibaba/open-code-review@f1101fd7f51304c82e4a4f292bbee88aea0823cf # v1.12.4
+        uses: alibaba/open-code-review@7a571b78d3493b249f6ad14d835c6a79a0a67d2e # v1.12.6
         with:
           llm_url: ${{ secrets.OCR_LLM_URL }}
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
