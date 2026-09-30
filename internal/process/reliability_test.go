@@ -1,8 +1,11 @@
 package process
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -185,5 +188,46 @@ func TestCleanSupervisorOutputDropsDebugNoise(t *testing.T) {
 	raw := []byte("{\"level\":\"debug\",\"message\":\"Path not found\"}\nprocess-compose down: signal: killed\n")
 	if got := cleanSupervisorOutput(raw); got != "process-compose down: signal: killed" {
 		t.Fatalf("cleaned output = %q", got)
+	}
+}
+
+func TestLogsReadsNativeSupervisorBuffer(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("native Windows uses a TCP control port")
+	}
+	t.Setenv("BERTH_HOME", t.TempDir())
+	worktree := t.TempDir()
+	if err := os.MkdirAll(filepath.Dir(Socket(worktree)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureToken(worktree); err != nil {
+		t.Fatal(err)
+	}
+	token, err := os.ReadFile(TokenFile(worktree))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", Socket(worktree))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() != "/process/logs/api%20worker/0/0" {
+			t.Errorf("path = %q", r.URL.EscapedPath())
+		}
+		if got := r.Header.Get("X-PC-Token-Key"); got != strings.TrimSpace(string(token)) {
+			t.Errorf("token = %q", got)
+		}
+		_, _ = fmt.Fprint(w, `{"logs":["first","second"]}`)
+	})}
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() { _ = server.Close() })
+
+	var stdout bytes.Buffer
+	if err := Logs(context.Background(), worktree, "api worker", &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdout.String(); got != "first\nsecond\n" {
+		t.Fatalf("logs = %q", got)
 	}
 }
