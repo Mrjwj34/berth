@@ -103,7 +103,7 @@ jobs:
         run: docker build -t berth-runtime:test -f runtime/Dockerfile .
 
       - name: Build the Go runtime image for level 4
-        run: docker build -t berth-runtime-golang:test --build-arg BASE_IMAGE=golang:1.25-bookworm -f runtime/Dockerfile .
+        run: docker build -t berth-runtime-golang:test --build-arg BASE_IMAGE=golang:1.26-bookworm -f runtime/Dockerfile .
 
       - name: Diagnose the runtime contract for a project without processes
         if: always()
