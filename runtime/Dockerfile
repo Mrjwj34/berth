@@ -1,5 +1,5 @@
 # Build once per toolchain, share image layers across all workspace containers.
-# For Go projects: --build-arg BASE_IMAGE=golang:1.25-bookworm
+# For Go projects: --build-arg BASE_IMAGE=golang:1.26-bookworm
 ARG BASE_IMAGE=debian:bookworm-slim
 FROM ${BASE_IMAGE}
 ARG TARGETARCH
