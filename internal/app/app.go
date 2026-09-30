@@ -353,7 +353,26 @@ func (a *App) Done(ctx context.Context, slug string, force bool) error {
 }
 func (a *App) doneLocked(ctx context.Context, ws state.Workspace, force bool) error {
 	if ws.RemovalHead != "" {
-		return a.resumeRemoval(ctx, ws, force)
+		stale, err := removalRecordStale(ctx, ws)
+		if err != nil {
+			return err
+		}
+		if !stale {
+			return a.resumeRemoval(ctx, ws, force)
+		}
+		// An interrupted removal recorded the checkout it was authorized to
+		// delete. When the checkout has moved since, that record no longer
+		// describes what would be destroyed, so resuming it would refuse
+		// forever. Drop the stale record and rerun the normal removal path
+		// against the live checkout; without --force it is audited by
+		// Preserved like any fresh removal.
+		if err := a.update(ctx, ws, func(w *state.Workspace) {
+			w.RemovalHead, w.RemovalBranch = "", ""
+			state.Touch(w)
+		}); err != nil {
+			return err
+		}
+		ws.RemovalHead, ws.RemovalBranch = "", ""
 	}
 	if err := validateIdentity(ctx, ws); err != nil {
 		return err
