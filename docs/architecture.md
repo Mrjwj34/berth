@@ -55,7 +55,10 @@ is identified by its path and Git directory, not by branch name, so a worktree t
 moves to `fix/*` stays usable. Reset retries finish the reset before setup. Removal
 retries retain repository identity checks, delete only the recorded commit using
 [Git's compare-and-delete](https://git-scm.com/docs/git-update-ref), and delete a
-branch only while it is still the original `berth/<slug>`.
+branch only while it is still the original `berth/<slug>`. A record whose
+checkout moved after the interruption no longer describes what would be
+destroyed: it is dropped and removal is re-authorized against the live checkout,
+so cleanup cannot deadlock on an obsolete snapshot.
 GC never discards pending removal records or grants them force authority. No
 separate journal service or background recovery process is needed.
 

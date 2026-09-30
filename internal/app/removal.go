@@ -12,6 +12,24 @@ import (
 	"github.com/Mrjwj34/berth/internal/worktree"
 )
 
+// removalRecordStale reports whether a recorded removal no longer describes the
+// live checkout. Only an existing checkout whose HEAD moved is stale; a missing
+// checkout or an unreadable HEAD stays on the recorded resume path, which has
+// its own handling for both.
+func removalRecordStale(ctx context.Context, ws state.Workspace) (bool, error) {
+	if _, err := os.Lstat(ws.Path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	head, err := gitx.Run(ctx, ws.Path, "rev-parse", "HEAD")
+	if err != nil {
+		return false, nil
+	}
+	return head != ws.RemovalHead, nil
+}
+
 // resumeRemoval only has authority to finish the exact removal recorded after
 // teardown and shutdown. Missing checkouts without that record confer no authority.
 func (a *App) resumeRemoval(ctx context.Context, ws state.Workspace, force bool) error {

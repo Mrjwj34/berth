@@ -131,3 +131,81 @@ func TestDoneRetriesAfterBranchDeletionFailure(t *testing.T) {
 		})
 	}
 }
+
+// TestDoneRetriesAfterCheckoutMoved covers an interrupted removal whose
+// recorded checkout has since moved: the stale record must not deadlock
+// cleanup, and removing must re-derive authority from the live checkout.
+func TestDoneRetriesAfterCheckoutMoved(t *testing.T) {
+	setup := func(t *testing.T) (*App, string, *WorkspaceView) {
+		a, repo := testApp(t)
+		ctx := context.Background()
+		v, err := a.New(ctx, "moved-checkout", "main", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A locked worktree makes `git worktree remove --force` fail after the
+		// removal record is written, simulating an interrupted removal.
+		if _, err := gitx.Run(ctx, repo, "worktree", "lock", v.Path); err != nil {
+			t.Fatal(err)
+		}
+		if err := a.Done(ctx, v.Path, true); err == nil {
+			t.Fatal("locked worktree should interrupt done")
+		}
+		ws, err := a.resolve(ctx, v.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ws.RemovalHead == "" {
+			t.Fatal("interrupted removal did not record the checkout")
+		}
+		if _, err := gitx.Run(ctx, repo, "worktree", "unlock", v.Path); err != nil {
+			t.Fatal(err)
+		}
+		// Move the checkout: new branch with a tree-changing commit, like the
+		// user continuing work in the workspace after the interruption.
+		if _, err := gitx.Run(ctx, v.Path, "checkout", "-b", "fix/moved"); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(v.Path, "moved-work"), []byte("unpushed"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		for _, args := range [][]string{{"add", "moved-work"}, {"commit", "-m", "moved work"}} {
+			if _, err := gitx.Run(ctx, v.Path, args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return a, repo, v
+	}
+	t.Run("force removes the moved checkout", func(t *testing.T) {
+		a, repo, v := setup(t)
+		if err := a.Done(context.Background(), v.Path, true); err != nil {
+			t.Fatalf("done refused a moved checkout forever: %v", err)
+		}
+		if _, err := os.Stat(v.Path); !os.IsNotExist(err) {
+			t.Fatal("moved checkout not removed")
+		}
+		// A moved checkout confers no branch deletion authority: both the
+		// moved-to branch and the original berth branch keep their commits.
+		for _, ref := range []string{"refs/heads/fix/moved", "refs/heads/" + v.Branch} {
+			if _, err := gitx.Run(context.Background(), repo, "show-ref", "--verify", ref); err != nil {
+				t.Fatalf("branch lost with moved checkout: %s", ref)
+			}
+		}
+		f, err := a.Store.Read(context.Background())
+		if err != nil || len(f.Workspaces) != 0 {
+			t.Fatalf("registration not released: %v, %+v", err, f)
+		}
+	})
+	t.Run("unpreserved work still blocks removal", func(t *testing.T) {
+		a, repo, v := setup(t)
+		if err := a.Done(context.Background(), v.Path, false); err == nil {
+			t.Fatal("done removed unpreserved work in a moved checkout")
+		}
+		if _, err := os.Stat(v.Path); err != nil {
+			t.Fatal("moved checkout removed despite unpreserved work")
+		}
+		if _, err := gitx.Run(context.Background(), repo, "show-ref", "--verify", "refs/heads/fix/moved"); err != nil {
+			t.Fatal("unpreserved branch lost")
+		}
+	})
+}
