@@ -138,6 +138,19 @@ process and the fix. Container workspaces are unaffected, because their commands
 run inside Linux. The supervisor itself also needs `BERTH_HOME` on a path without
 spaces on Windows.
 
+### No console windows
+
+On Windows the supervisor runs under `CREATE_NO_WINDOW`, so its console exists
+but is never displayed, and the `cmd /C` processes process-compose starts attach
+to that hidden console instead of getting one window each. `berth up` therefore
+opens no windows; process output still goes to `process-compose.log` only. A
+process opened by the project itself, or by a GUI tool it launches, is not
+covered by this: nothing can prevent a program from creating its own window.
+
+The supervisor owns the hidden console rather than inheriting the terminal berth
+was started from, so `down` is still the way to stop it; closing the terminal
+does not stop a workspace.
+
 ### When the supervisor state is unknown
 
 If the control files exist but the supervisor does not answer, berth treats the
