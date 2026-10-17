@@ -1,5 +1,5 @@
 PackageIdentifier: "Mrjwj34.berth"
-PackageVersion: "0.4.0"
+PackageVersion: "0.4.2"
 InstallerType: "zip"
 NestedInstallerType: "portable"
 NestedInstallerFiles:
@@ -7,10 +7,10 @@ NestedInstallerFiles:
     PortableCommandAlias: "berth"
 Installers:
   - Architecture: "x64"
-    InstallerUrl: "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_windows_amd64.zip"
-    InstallerSha256: "b2e58eb18557d7a1e80c40082c893a7dfec0f182f2db2f4698be5448d5166679"
+    InstallerUrl: "https://github.com/Mrjwj34/berth/releases/download/v0.4.2/berth_0.4.2_windows_amd64.zip"
+    InstallerSha256: "e97af0f24a5d4d90cdc06a75c3978b1a6feaec9ce9b3b2abc21d5b3190799170"
   - Architecture: "arm64"
-    InstallerUrl: "https://github.com/Mrjwj34/berth/releases/download/v0.4.0/berth_0.4.0_windows_arm64.zip"
-    InstallerSha256: "72f52ebb280ca68c394d871d1c3a1b5994e9cb09dd902de657b30bfea0c39382"
+    InstallerUrl: "https://github.com/Mrjwj34/berth/releases/download/v0.4.2/berth_0.4.2_windows_arm64.zip"
+    InstallerSha256: "7937faf1a6a6ab6014aa02a3290a22dd7e4ac404220f7a76e792ba4fef3e05b0"
 ManifestType: "installer"
 ManifestVersion: "1.6.0"
